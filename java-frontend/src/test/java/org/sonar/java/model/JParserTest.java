@@ -89,6 +89,12 @@ public class JParserTest {
       assertEquals(0, t.eofToken().column());
     }
     {
+      CompilationUnitTree t = test(" ");
+      assertEquals("", t.eofToken().text());
+      assertEquals(1, t.eofToken().line());
+      assertEquals(1, t.eofToken().column());
+    }
+    {
       CompilationUnitTree t = test(" \n");
       assertEquals("", t.eofToken().text());
       assertEquals(2, t.eofToken().line());
@@ -132,8 +138,8 @@ public class JParserTest {
   public void type_arguments() {
     test("class C<P> {"
       + "  void m() {"
-      + "    this.<C   > m();"
-      + "    this.<C<C>> m();"
+      + "    this.<C  /**/> m();"
+      + "    this.<C<C   >> m();"
       + "  }"
       + "}");
   }
@@ -141,15 +147,18 @@ public class JParserTest {
   @Test
   public void type_parameters() {
     test("class C<P> {"
-      + "  <P             > void m1() {}"
+      + "  <P         /**/> void m1() {}"
       + "  <P extends C<C>> void m2() {}"
       + "}");
   }
 
   @Test
   public void empty_declarations() {
-    // after each import declaration
-    test("import i; ;");
+    // as the only declaration
+    test(";");
+
+    // after last import declaration
+    test("import a; import b; ;");
 
     // before first and after each body declaration
     test("class C { ; void m(); ; }");

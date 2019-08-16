@@ -230,7 +230,7 @@ public class JParser {
 
   /**
    * @param unitName see {@link ASTParser#setUnitName(String)}
-   * @throws RecognitionException in case of syntax error
+   * @throws RecognitionException in case of syntax errors
    */
   public static CompilationUnitTree parse(String version, String unitName, String source, List<File> classpath) {
     ASTParser astParser = ASTParser.newParser(AST.JLS12);
@@ -293,7 +293,7 @@ public class JParser {
     List<Token> tokens = new ArrayList<>();
     Scanner scanner = new Scanner(
       true,
-      true,
+      false,
       false,
       CompilerOptions.versionToJdkLevel(version),
       null,
@@ -323,7 +323,7 @@ public class JParser {
 
   private int firstTokenIndexAfter(ASTNode e) {
     int index = tokenManager.firstIndexAfter(e, /* any */ -1);
-    while (isWhitespaceOrComment(tokenManager.get(index))) {
+    while (tokenManager.get(index).isComment()) {
       index++;
     }
     return index;
@@ -368,48 +368,11 @@ public class JParser {
     return createSyntaxToken(tokenManager.lastIndexIn(e, tokenType));
   }
 
-  @Deprecated
-  private InternalSyntaxToken createSyntaxToken(int position, String value) {
-    assert ">".equals(value);
-    return new InternalSyntaxToken(
-      compilationUnit.getLineNumber(position),
-      compilationUnit.getColumnNumber(position),
-      value,
-      Collections.emptyList(),
-      0,
-      0,
-      false
-    );
-  }
-
   private InternalSyntaxToken createSyntaxToken(int tokenIndex) {
-    Token t;
-
-    List<SyntaxTrivia> trivias = new ArrayList<>();
-    int commentIndex = tokenIndex;
-    while (commentIndex > 0) {
-      t = tokenManager.get(commentIndex - 1);
-      if (!t.isComment() && t.tokenType != TerminalTokens.TokenNameWHITESPACE) {
-        break;
-      }
-      commentIndex--;
-    }
-    for (int i = commentIndex; i < tokenIndex; i++) {
-      t = tokenManager.get(i);
-      if (t.isComment()) {
-        trivias.add(new InternalSyntaxTrivia(
-          t.toString(tokenManager.getSource()),
-          compilationUnit.getLineNumber(t.originalStart),
-          compilationUnit.getColumnNumber(t.originalStart)
-        ));
-      }
-    }
-
-    t = tokenManager.get(tokenIndex);
-
+    Token t = tokenManager.get(tokenIndex);
     if (t.tokenType == TerminalTokens.TokenNameEOF) {
       if (t.originalStart == 0) {
-        return new InternalSyntaxToken(1, 0, "", trivias, 0, 0, true);
+        return new InternalSyntaxToken(1, 0, "", collectComments(tokenIndex), 0, 0, true);
       }
       final int position = t.originalStart - 1;
       final char c = tokenManager.getSource().charAt(position);
@@ -421,24 +384,46 @@ public class JParser {
       } else {
         column++;
       }
-      return new InternalSyntaxToken(line, column, "", trivias, 0, 0, true);
+      return new InternalSyntaxToken(line, column, "", collectComments(tokenIndex), 0, 0, true);
     }
-
     return new InternalSyntaxToken(
       compilationUnit.getLineNumber(t.originalStart),
       compilationUnit.getColumnNumber(t.originalStart),
       t.toString(tokenManager.getSource()),
-      trivias,
-      0,
-      0,
-      false
+      collectComments(tokenIndex),
+      0, 0, false
     );
   }
 
-  private static boolean isWhitespaceOrComment(Token token) {
-    return token.tokenType == TerminalTokens.TokenNameWHITESPACE
-      || token.tokenType == TerminalTokens.TokenNameCOMMENT_LINE
-      || token.tokenType == TerminalTokens.TokenNameCOMMENT_BLOCK;
+  private InternalSyntaxToken createSpecialToken(int tokenIndex) {
+    Token t = tokenManager.get(tokenIndex);
+    List<SyntaxTrivia> comments = t.tokenType == TerminalTokens.TokenNameGREATER
+      ? collectComments(tokenIndex)
+      : Collections.emptyList();
+    return new InternalSyntaxToken(
+      compilationUnit.getLineNumber(t.originalEnd),
+      compilationUnit.getColumnNumber(t.originalEnd),
+      ">",
+      comments,
+      0, 0, false
+    );
+  }
+
+  private List<SyntaxTrivia> collectComments(int tokenIndex) {
+    int commentIndex = tokenIndex;
+    while (commentIndex > 0 && tokenManager.get(commentIndex - 1).isComment()) {
+      commentIndex--;
+    }
+    List<SyntaxTrivia> comments = new ArrayList<>();
+    for (int i = commentIndex; i < tokenIndex; i++) {
+      Token t = tokenManager.get(i);
+      comments.add(new InternalSyntaxTrivia(
+        t.toString(tokenManager.getSource()),
+        compilationUnit.getLineNumber(t.originalStart),
+        compilationUnit.getColumnNumber(t.originalStart)
+      ));
+    }
+    return comments;
   }
 
   private void addEmptyDeclarationsToList(int tokenIndex, List list) {
@@ -447,7 +432,7 @@ public class JParser {
       do {
         tokenIndex++;
         token = tokenManager.get(tokenIndex);
-      } while (isWhitespaceOrComment(token));
+      } while (token.isComment());
       if (token.tokenType == TerminalTokens.TokenNameSEMICOLON) {
         list.add(
           new EmptyStatementTreeImpl(createSyntaxToken(tokenIndex))
@@ -496,6 +481,10 @@ public class JParser {
     List<Tree> types = new ArrayList<>();
     for (Object type : e.types()) {
       processBodyDeclaration((AbstractTypeDeclaration) type, types);
+    }
+
+    if (e.imports().isEmpty() && e.types().isEmpty()) {
+      addEmptyDeclarationsToList(-1, imports);
     }
 
     return new JavaTree.CompilationUnitTreeImpl(
@@ -964,14 +953,14 @@ public class JParser {
     }
     ASTNode last = (ASTNode) list.get(list.size() - 1);
     int tokenIndex = tokenManager.firstIndexAfter(last, /* any */ -1);
-    while (isWhitespaceOrComment(tokenManager.get(tokenIndex))) {
+    while (tokenManager.get(tokenIndex).isComment()) {
       tokenIndex++;
     }
     return convertTypeArguments(
       firstTokenBefore((ASTNode) list.get(0), TerminalTokens.TokenNameLESS),
       list,
       // TerminalTokens.TokenNameUNSIGNED_RIGHT_SHIFT vs TerminalTokens.TokenNameGREATER
-      createSyntaxToken(tokenManager.get(tokenIndex).originalEnd, ">")
+      createSpecialToken(tokenIndex)
     );
   }
 
@@ -983,10 +972,10 @@ public class JParser {
     TypeArgumentListTreeImpl typeArguments = new TypeArgumentListTreeImpl(l, new ArrayList<>(), new ArrayList<>(), g);
     for (int i = 0; i < list.size(); i++) {
       Type o = (Type) list.get(i);
-      typeArguments.add(convertType(o));
-      if (i < list.size() - 1) {
-        typeArguments.separators().add(firstTokenAfter(o, TerminalTokens.TokenNameCOMMA));
+      if (i > 0) {
+        typeArguments.separators().add(firstTokenBefore(o, TerminalTokens.TokenNameCOMMA));
       }
+      typeArguments.add(convertType(o));
     }
     return typeArguments;
   }
@@ -996,15 +985,15 @@ public class JParser {
       return new TypeParameterListTreeImpl();
     }
     ASTNode last = (ASTNode) list.get(list.size() - 1);
-    int tokenIndex = tokenManager.firstIndexAfter(last, /* any */ -1 );
-    while (isWhitespaceOrComment(tokenManager.get(tokenIndex))) {
+    int tokenIndex = tokenManager.firstIndexAfter(last, /* any */ -1);
+    while (tokenManager.get(tokenIndex).isComment()) {
       tokenIndex++;
     }
     TypeParameterListTreeImpl t = new TypeParameterListTreeImpl(
       firstTokenBefore((ASTNode) list.get(0), TerminalTokens.TokenNameLESS),
       new ArrayList<>(), new ArrayList<>(),
       // TerminalTokens.TokenNameUNSIGNED_RIGHT_SHIFT vs TerminalTokens.TokenNameGREATER
-      createSyntaxToken(tokenManager.get(tokenIndex).originalEnd, ">")
+      createSpecialToken(tokenIndex)
     );
     for (int i = 0; i < list.size(); i++) {
       TypeParameter o = (TypeParameter) list.get(i);
@@ -1105,6 +1094,7 @@ public class JParser {
 
   private IdentifierTreeImpl convertSimpleName(@Nullable SimpleName e) {
     if (e == null) {
+      // e.g. break-statement without label
       return null;
     }
     return new IdentifierTreeImpl(
@@ -1416,7 +1406,7 @@ public class JParser {
               do {
                 tokenIndex--;
                 token = tokenManager.get(tokenIndex);
-              } while (isWhitespaceOrComment(token));
+              } while (token.isComment());
               if (token.tokenType == TerminalTokens.TokenNameSEMICOLON) {
                 resources.separators().add(
                   createSyntaxToken(tokenIndex)
@@ -1538,6 +1528,7 @@ public class JParser {
 
   private ExpressionTree convertExpression(@Nullable Expression node) {
     if (node == null) {
+      // e.g. condition expression in for-statement
       return null;
     }
     switch (node.getNodeType()) {
@@ -2196,13 +2187,19 @@ public class JParser {
       }
       case ASTNode.PARAMETERIZED_TYPE: {
         ParameterizedType e = (ParameterizedType) node;
+        int pos = e.getStartPosition() + e.getLength() - 1;
         return new JavaTree.ParameterizedTypeTreeImpl(
           convertType(e.getType()),
           convertTypeArguments(
             firstTokenAfter(e.getType(), TerminalTokens.TokenNameLESS),
             e.typeArguments(),
-            // TerminalTokens.TokenNameUNSIGNED_RIGHT_SHIFT vs TerminalTokens.TokenNameGREATER
-            createSyntaxToken(e.getStartPosition() + e.getLength() - 1, ">")
+            new InternalSyntaxToken(
+              compilationUnit.getLineNumber(pos),
+              compilationUnit.getColumnNumber(pos),
+              ">",
+              /* TODO */ Collections.emptyList(),
+              0, 0, false
+            )
           )
         );
       }
