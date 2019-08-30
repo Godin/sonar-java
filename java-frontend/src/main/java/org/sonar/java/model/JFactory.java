@@ -21,12 +21,13 @@ package org.sonar.java.model;
 
 import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.IBinding;
+import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.internal.compiler.lookup.LookupEnvironment;
 import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
 import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
-import org.sonar.java.resolve.Symbols;
-import org.sonar.plugins.java.api.semantic.Symbol;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Method;
@@ -38,6 +39,7 @@ final class JFactory {
   private final AST ast;
 
   private final Map<ITypeBinding, JType> types = new HashMap<>();
+  private final Map<IBinding, JSymbol> symbols = new HashMap<>();
 
   JFactory(AST ast) {
     this.ast = ast;
@@ -47,9 +49,16 @@ final class JFactory {
     return types.computeIfAbsent(binding, k -> new JType(this, binding));
   }
 
-  Symbol.TypeSymbol typeSymbol(ITypeBinding binding) {
-    // FIXME implement
-    return Symbols.unknownSymbol;
+  JTypeSymbol typeSymbol(ITypeBinding binding) {
+    return (JTypeSymbol) symbols.computeIfAbsent(binding, k -> new JTypeSymbol(this, binding));
+  }
+
+  JVariableSymbol variableSymbol(IVariableBinding binding) {
+    return (JVariableSymbol) symbols.computeIfAbsent(binding, k -> new JVariableSymbol(this, binding));
+  }
+
+  JMethodSymbol methodSymbol(IMethodBinding binding) {
+    return (JMethodSymbol) symbols.computeIfAbsent(binding, k -> new JMethodSymbol(this, binding));
   }
 
   @Nullable

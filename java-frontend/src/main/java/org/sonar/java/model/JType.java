@@ -32,9 +32,6 @@ final class JType implements Type, Type.ArrayType {
   private final JFactory factory;
   private final ITypeBinding typeBinding;
 
-  /**
-   * Use {@link JFactory#type(ITypeBinding)} to create instances of this class.
-   */
   JType(JFactory factory, ITypeBinding typeBinding) {
     this.factory = Objects.requireNonNull(factory);
     this.typeBinding = Objects.requireNonNull(typeBinding);
