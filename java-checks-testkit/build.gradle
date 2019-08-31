@@ -1,0 +1,10 @@
+dependencies {
+  compile project(':java-frontend')
+  compile 'org.assertj:assertj-core:3.6.1'
+  compile 'org.mockito:mockito-core:2.21.0'
+  testCompile 'ch.qos.logback:logback-classic:0.9.30'
+
+  testCompile 'org.junit.jupiter:junit-jupiter:5.5.1'
+  testRuntime 'org.junit.vintage:junit-vintage-engine:5.5.1'
+  testCompile 'junit:junit:4.12'
+}

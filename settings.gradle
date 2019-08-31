@@ -1,0 +1,5 @@
+rootProject.name = 'sonar-java'
+
+include 'java-frontend'
+include 'java-checks-testkit'
+include 'java-checks'
