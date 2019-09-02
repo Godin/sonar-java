@@ -24,6 +24,7 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class LeastSpecificTypeCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/LeastSpecificTypeCheck.java", new LeastSpecificTypeCheck());

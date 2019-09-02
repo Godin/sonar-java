@@ -28,6 +28,7 @@ import org.sonar.plugins.java.api.tree.MethodTree;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.Ignore("uses old parser")
 public class ExpressionsHelperTest extends JavaParserHelper {
 
   @Test

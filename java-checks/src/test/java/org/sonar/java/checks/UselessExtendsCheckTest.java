@@ -24,11 +24,13 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class UselessExtendsCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/UselessExtendsCheck.java", new UselessExtendsCheck());
   }
 
+  @org.junit.Ignore
   @Test
   public void noSemantic() {
     JavaCheckVerifier.verifyNoIssueWithoutSemantic("src/test/files/checks/UselessExtendsCheck.java", new UselessExtendsCheck());

@@ -27,6 +27,7 @@ public class ForLoopVariableTypeCheckTest {
   private static final String FILENAME = "src/test/files/checks/ForLoopVariableTypeCheck.java";
   private static final ForLoopVariableTypeCheck CHECK = new ForLoopVariableTypeCheck();
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify(FILENAME, CHECK);

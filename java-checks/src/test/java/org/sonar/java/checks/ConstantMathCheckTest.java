@@ -24,6 +24,7 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class ConstantMathCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/ConstantMath.java", new ConstantMathCheck());

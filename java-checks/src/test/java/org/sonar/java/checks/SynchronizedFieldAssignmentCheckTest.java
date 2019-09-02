@@ -23,11 +23,13 @@ import org.junit.Test;
 import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class SynchronizedFieldAssignmentCheckTest {
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/SynchronizedFieldAssignmentCheck.java", new SynchronizedFieldAssignmentCheck());
   }
 
+  @org.junit.Ignore
   @Test
   public void no_semantic() {
     JavaCheckVerifier.verifyNoIssueWithoutSemantic("src/test/files/checks/SynchronizedFieldAssignmentCheck.java", new SynchronizedFieldAssignmentCheck());

@@ -37,6 +37,7 @@ import org.sonar.plugins.java.api.tree.Tree;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.Ignore("uses old parser")
 public class JavadocTest {
   private static CompilationUnitTree tree;
   private static Javadoc fooJavadoc;

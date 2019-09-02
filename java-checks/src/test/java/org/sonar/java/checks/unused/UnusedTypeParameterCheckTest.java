@@ -24,6 +24,7 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class UnusedTypeParameterCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/unused/UnusedTypeParameterCheck.java", new UnusedTypeParameterCheck());

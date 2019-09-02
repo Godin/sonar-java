@@ -24,6 +24,7 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class ArrayForVarArgCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/ArrayForVarArgCheck.java", new ArrayForVarArgCheck());

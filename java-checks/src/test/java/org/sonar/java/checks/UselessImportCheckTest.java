@@ -24,6 +24,7 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class UselessImportCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void detected_with_package() {
     JavaCheckVerifier.verify("src/test/files/checks/UselessImportCheck/WithPackage.java", new UselessImportCheck());

@@ -24,11 +24,13 @@ import org.sonar.java.checks.verifier.JavaCheckVerifier;
 
 public class ControllingPermissionsCheckTest {
 
+  @org.junit.Ignore
   @Test
   public void test() {
     JavaCheckVerifier.verify("src/test/files/checks/security/ControllingPermissionsCheck.java", new ControllingPermissionsCheck());
   }
 
+  @org.junit.Ignore
   @Test
   public void no_issue_without_semantic() {
     JavaCheckVerifier.verifyNoIssueWithoutSemantic("src/test/files/checks/security/ControllingPermissionsCheck.java", new ControllingPermissionsCheck());
