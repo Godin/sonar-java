@@ -20,6 +20,8 @@
 package org.sonar.java.checks.helpers;
 
 import javax.annotation.CheckForNull;
+
+import org.sonar.java.model.JInternals;
 import org.sonar.java.model.LiteralUtils;
 import org.sonar.java.resolve.JavaSymbol;
 import org.sonar.plugins.java.api.semantic.Symbol;
@@ -111,7 +113,7 @@ public class ConstantUtils {
       }
     }
     // FIXME
-    return null;
+    return JInternals.constantValue((Symbol.VariableSymbol) symbol);
 //    return ((JavaSymbol.VariableJavaSymbol) symbol).constantValue().orElse(null);
   }
 
