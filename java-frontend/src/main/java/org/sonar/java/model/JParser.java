@@ -1165,9 +1165,11 @@ public class JParser {
       // e.g. break-statement without label
       return null;
     }
-    return new IdentifierTreeImpl(
+    IdentifierTreeImpl t = new IdentifierTreeImpl(
       firstTokenIn(e, TerminalTokens.TokenNameIdentifier)
     );
+    t.binding = e.resolveBinding();
+    return t;
   }
 
   private BlockTreeImpl convertBlock(@Nullable Block e) {

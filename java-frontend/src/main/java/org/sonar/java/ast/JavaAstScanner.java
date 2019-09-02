@@ -99,7 +99,7 @@ public class JavaAstScanner {
         version,
         inputFile.filename(),
         fileContent,
-        resolveBindings,
+        true,
         visitor.getClasspath()
       );
       visitor.visitFile(ast);

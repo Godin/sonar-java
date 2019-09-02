@@ -137,6 +137,8 @@ public class VisitorsBridge {
           return;
         }
         createSonarSymbolTable(tree);
+
+        ((JavaTree.CompilationUnitTreeImpl) tree).useNewSema = true;
       } else {
         SemanticModel.handleMissingTypes(tree);
       }

@@ -110,7 +110,9 @@ public class ConstantUtils {
         return Boolean.FALSE;
       }
     }
-    return ((JavaSymbol.VariableJavaSymbol) symbol).constantValue().orElse(null);
+    // FIXME
+    return null;
+//    return ((JavaSymbol.VariableJavaSymbol) symbol).constantValue().orElse(null);
   }
 
   @CheckForNull

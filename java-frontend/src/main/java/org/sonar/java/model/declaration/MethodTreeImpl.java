@@ -21,10 +21,6 @@ package org.sonar.java.model.declaration;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.List;
-import java.util.Objects;
-import javax.annotation.Nullable;
-
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.sonar.java.ast.parser.FormalParametersListTreeImpl;
 import org.sonar.java.ast.parser.QualifiedIdentifierListTreeImpl;
@@ -33,6 +29,7 @@ import org.sonar.java.cfg.CFG;
 import org.sonar.java.model.JavaTree;
 import org.sonar.java.model.ModifiersUtils;
 import org.sonar.java.resolve.JavaSymbol;
+import org.sonar.java.resolve.Symbols;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.tree.AnnotationTree;
 import org.sonar.plugins.java.api.tree.BlockTree;
@@ -49,6 +46,10 @@ import org.sonar.plugins.java.api.tree.TreeVisitor;
 import org.sonar.plugins.java.api.tree.TypeParameters;
 import org.sonar.plugins.java.api.tree.TypeTree;
 import org.sonar.plugins.java.api.tree.VariableTree;
+
+import javax.annotation.Nullable;
+import java.util.List;
+import java.util.Objects;
 
 public class MethodTreeImpl extends JavaTree implements MethodTree {
 
@@ -216,6 +217,11 @@ public class MethodTreeImpl extends JavaTree implements MethodTree {
 
   @Override
   public Symbol.MethodSymbol symbol() {
+    if (root.useNewSema) {
+      return methodBinding != null
+        ? root.sema.methodSymbol(methodBinding)
+        : Symbols.unknownMethodSymbol;
+    }
     return symbol;
   }
 

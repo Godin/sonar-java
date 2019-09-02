@@ -20,10 +20,10 @@
 package org.sonar.java.model.expression;
 
 import com.google.common.collect.Iterables;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-
+import org.eclipse.jdt.core.dom.IBinding;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.sonar.java.model.AbstractTypedTree;
 import org.sonar.java.model.InternalSyntaxToken;
 import org.sonar.java.model.JavaTree;
@@ -35,11 +35,19 @@ import org.sonar.plugins.java.api.tree.SyntaxToken;
 import org.sonar.plugins.java.api.tree.Tree;
 import org.sonar.plugins.java.api.tree.TreeVisitor;
 
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
 public class IdentifierTreeImpl extends AbstractTypedTree implements IdentifierTree, JavaTree.AnnotatedTypeTree {
 
   private final InternalSyntaxToken nameToken;
   private Symbol symbol = Symbols.unknownSymbol;
   private List<AnnotationTree> annotations;
+
+  @Nullable
+  public IBinding binding;
 
   public IdentifierTreeImpl(InternalSyntaxToken nameToken) {
     super(Kind.IDENTIFIER);
@@ -73,6 +81,20 @@ public class IdentifierTreeImpl extends AbstractTypedTree implements IdentifierT
 
   @Override
   public Symbol symbol() {
+    if (root.useNewSema) {
+      // FIXME
+      if (binding != null) {
+        switch (binding.getKind()) {
+          case IBinding.TYPE:
+            return root.sema.typeSymbol((ITypeBinding) binding);
+          case IBinding.METHOD:
+            return root.sema.methodSymbol((IMethodBinding) binding);
+          case IBinding.VARIABLE:
+            return root.sema.variableSymbol((IVariableBinding) binding);
+        }
+      }
+      return Symbols.unknownSymbol;
+    }
     return symbol;
   }
 
