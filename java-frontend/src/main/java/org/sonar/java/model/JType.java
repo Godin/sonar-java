@@ -83,13 +83,12 @@ final class JType implements Type, Type.ArrayType {
     return typeBinding.isClass()
       // in our implementation also
       || typeBinding.isInterface()
-      || typeBinding.isEnum()
-      || typeBinding.isAnnotation(); // TODO isAnnotation probably redundant with isInterface
+      || typeBinding.isEnum();
   }
 
   @Override
   public boolean isVoid() {
-    return "void".equals(typeBinding.getName());
+    return "V".equals(typeBinding.getBinaryName());
   }
 
   @Override
@@ -101,6 +100,7 @@ final class JType implements Type, Type.ArrayType {
 
   @Override
   public boolean isPrimitive(Primitives primitive) {
+    // TODO suboptimal
     return isPrimitive() && primitive.name().toLowerCase().equals(typeBinding.getName());
   }
 
@@ -123,18 +123,17 @@ final class JType implements Type, Type.ArrayType {
 
   @Override
   public String fullyQualifiedName() {
-    if (typeBinding.isNullType()) {
-      return "<nulltype>";
+    return fullyQualifiedName(typeBinding);
+  }
+
+  private static String fullyQualifiedName(ITypeBinding typeBinding) {
+    if (typeBinding.isNullType() || typeBinding.isPrimitive()) {
+      return typeBinding.getName();
+    } else if (typeBinding.isArray()) {
+      return fullyQualifiedName(typeBinding.getComponentType()) + "[]";
+    } else {
+      return typeBinding.getBinaryName(); // TODO nullable
     }
-    if (typeBinding.isTypeVariable()) {
-      return typeBinding.getQualifiedName();
-    }
-    if (typeBinding.isMember()) {
-      // TODO helped for ThrowsSeveralCheckedExceptionCheck and others, add test
-      return typeBinding.getBinaryName();
-//      return typeBinding.getDeclaringClass().getErasure().getQualifiedName() + "$" + typeBinding.getErasure().getName();
-    }
-    return typeBinding.getErasure().getQualifiedName();
   }
 
   @Override
