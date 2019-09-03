@@ -21,49 +21,74 @@ package org.sonar.java.model;
 
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.sonar.plugins.java.api.semantic.Type;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-class JSemaTest {
+class JTypeSymbolTest {
 
   @Test
-  void type() {
-    ITypeBinding typeBinding = Objects.requireNonNull(sema.resolveType("int"));
-    assertThat(sema.type(typeBinding))
-      .isNotNull()
-      .isSameAs(sema.type(typeBinding));
-  }
-
-  @Test
-  void resolveType() {
+  void superClass() {
+    Type javaLangObject = typeSymbol("java.lang.Object").type();
     assertAll(
       () ->
-        assertThat(sema.resolveType("void"))
-          .isNotNull(),
+        assertThat(typeSymbol("java.lang.Object").superClass())
+          .as("for java.lang.Object")
+          .isNull(),
       () ->
-        assertThat(sema.resolveType("java.util.Map"))
-          .isNotNull(),
+        assertThat(typeSymbol("java.lang.String").superClass())
+          .as("for classes")
+          .isSameAs(javaLangObject),
       () ->
-        assertThat(sema.resolveType("java.util.Map$Entry"))
-          .isNotNull(),
+        assertThat(typeSymbol("java.util.Map").superClass())
+          .as("for interfaces")
+          .isSameAs(javaLangObject),
       () ->
-        assertThat(sema.resolveType("java.util.Map$Entry[][]"))
-          .isNotNull()
+        assertThat(typeSymbol("int").superClass())
+          .as("for primitives")
+          .isNull(),
+      () ->
+        assertThat(typeSymbol("int[]").superClass())
+          .as("for arrays")
+          .isSameAs(javaLangObject)
     );
   }
 
+  static abstract class Target implements Serializable {
+  }
+
   @Test
-  void typeSymbol() {
-    ITypeBinding typeBinding = Objects.requireNonNull(sema.resolveType("int"));
-    assertThat(sema.typeSymbol(typeBinding))
-      .isNotNull()
-      .isSameAs(sema.typeSymbol(typeBinding));
+  void interfaces() {
+    assertThat(typeSymbol("java.lang.Object").interfaces())
+      .isEmpty();
+    assertThat(typeSymbol(Target.class.getName()).interfaces())
+      .containsOnly(type("java.io.Serializable"));
+  }
+
+  @Test
+  void memberSymbols() {
+    assertThat(typeSymbol("java.lang.Object").memberSymbols())
+      .isNotEmpty();
+  }
+
+  @Test
+  void lookupSymbols() {
+    assertThat(typeSymbol("java.lang.Object").lookupSymbols("hashCode"))
+      .hasSize(1);
+  }
+
+  private JTypeSymbol typeSymbol(String name) {
+    return sema.typeSymbol(Objects.requireNonNull(sema.resolveType(name)));
+  }
+
+  private JType type(String name) {
+    return sema.type(Objects.requireNonNull(sema.resolveType(name)));
   }
 
   private JSema sema;
@@ -72,7 +97,7 @@ class JSemaTest {
   void setup() {
     ASTParser astParser = ASTParser.newParser(AST.JLS12);
     astParser.setEnvironment(
-      new String[]{},
+      new String[]{"target/test-classes"},
       new String[]{},
       new String[]{},
       true
