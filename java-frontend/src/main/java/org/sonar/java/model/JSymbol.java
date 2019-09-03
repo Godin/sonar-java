@@ -25,6 +25,7 @@ import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.sonar.java.resolve.Symbols;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.semantic.SymbolMetadata;
 import org.sonar.plugins.java.api.semantic.Type;
@@ -95,10 +96,14 @@ public abstract class JSymbol implements Symbol {
         ITypeBinding declaringClass = b.getDeclaringClass();
         IMethodBinding declaringMethod = b.getDeclaringMethod();
         if (declaringClass == null && declaringMethod == null) {
-          // variable in a static or instance initializer or local variable in recovered method
+          // variable declared in a static or instance initializer
+          // or local variable declared in recovered method
+          // or array.length
           // See HiddenFieldCheck
           Tree t = declaration();
-          assert t != null; // TODO what about access to field in another file?
+          if (t == null) {
+            return Symbols.unknownSymbol;
+          }
           while (true) {
             t = t.parent();
             switch (t.kind()) {
