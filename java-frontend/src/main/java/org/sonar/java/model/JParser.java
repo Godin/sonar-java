@@ -2137,7 +2137,7 @@ public class JParser {
         );
         t.complete(
           convertTypeArguments(e.typeArguments()),
-          new IdentifierTreeImpl(lastTokenIn(e, TerminalTokens.TokenNamenew))
+          new IdentifierTreeImpl(lastTokenIn(e, TerminalTokens.TokenNamenew)) // TODO set type to instantiated and e.resolveMethodBinding()
         );
         return t;
       }
@@ -2281,12 +2281,16 @@ public class JParser {
         } else if (e.getNodeType() == ASTNode.NORMAL_ANNOTATION) {
           for (int i = 0; i < ((NormalAnnotation) e).values().size(); i++) {
             MemberValuePair o = (MemberValuePair) ((NormalAnnotation) e).values().get(i);
-            arguments.add(new AssignmentExpressionTreeImpl(
+            AssignmentExpressionTreeImpl t = new AssignmentExpressionTreeImpl(
               Tree.Kind.ASSIGNMENT,
               convertSimpleName(o.getName()),
               firstTokenAfter(o.getName(), TerminalTokens.TokenNameEQUAL),
               convertExpression(o.getValue())
-            ));
+            );
+            t.setType(
+              t.variable().symbolType() // TODO check old implementation
+            );
+            arguments.add(t);
             if (i < ((NormalAnnotation) e).values().size() - 1) {
               arguments.separators().add(
                 firstTokenAfter(o, TerminalTokens.TokenNameCOMMA)

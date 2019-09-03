@@ -63,7 +63,9 @@ final class JType implements Type, Type.ArrayType {
       // as in our implementation
       return false;
     }
-    return typeBinding.isSubTypeCompatible(ast.resolveType(fullyQualifiedName));
+    return typeBinding.isSubTypeCompatible(
+      ast.resolveType(fullyQualifiedName) // TODO nullable
+    );
   }
 
   @Override
