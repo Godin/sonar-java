@@ -97,21 +97,21 @@ public class VisitorsBridge {
         allScanners.add((JavaFileScanner) visitor);
       }
     }
+    this.classpath = projectClasspath;
     this.executableScanners = allScanners.stream().filter(isIssuableSubscriptionVisitor.negate()).collect(Collectors.toList());
     this.scannerRunner = new ScannerRunner(allScanners);
     this.sonarComponents = sonarComponents;
-    this.classpath = projectClasspath;
     this.classLoader = ClassLoaderBuilder.create(projectClasspath);
     this.symbolicExecutionEnabled = symbolicExecutionMode.isEnabled();
     this.behaviorCache = new BehaviorCache(classLoader, symbolicExecutionMode.isCrossFileEnabled());
   }
 
-  public List<File> getClasspath() {
-    return classpath;
-  }
-
   public JavaVersion getJavaVersion() {
     return javaVersion;
+  }
+
+  public List<File> getClasspath() {
+    return classpath;
   }
 
   public void setJavaVersion(JavaVersion javaVersion) {
@@ -127,7 +127,6 @@ public class VisitorsBridge {
     boolean fileParsed = parsedTree != null;
     if (fileParsed && parsedTree.is(Tree.Kind.COMPILATION_UNIT)) {
       tree = (CompilationUnitTree) parsedTree;
-      if (!JParser.SEMA) // TODO
       if (isNotJavaLangOrSerializable(PackageUtils.packageName(tree.packageDeclaration(), "/"))) {
         try {
           semanticModel = SemanticModel.createFor(tree, classLoader);
@@ -141,6 +140,8 @@ public class VisitorsBridge {
       } else {
         SemanticModel.handleMissingTypes(tree);
       }
+
+      ((JavaTree.CompilationUnitTreeImpl) tree).useNewSema = JParser.SEMA;
     }
     JavaFileScannerContext javaFileScannerContext = createScannerContext(tree, semanticModel, sonarComponents, fileParsed);
     // Symbolic execution checks

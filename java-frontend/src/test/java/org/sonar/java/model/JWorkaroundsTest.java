@@ -22,12 +22,10 @@ package org.sonar.java.model;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.IAnnotationBinding;
-import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 public class JWorkaroundsTest {
 
@@ -47,13 +45,6 @@ public class JWorkaroundsTest {
     astParser.setUnitName("Example.java");
     astParser.setSource("".toCharArray());
     ast = astParser.createAST(null).getAST();
-  }
-
-  @Test
-  public void resolveType() {
-    ITypeBinding typeBinding = JWorkarounds.resolveType(ast, "java.lang.Object");
-    assertNotNull(typeBinding);
-    assertEquals("java.lang.Object", typeBinding.getQualifiedName());
   }
 
   @Test

@@ -49,7 +49,7 @@ abstract class JSymbolMetadata implements SymbolMetadata {
   public final List<AnnotationValue> valuesForAnnotation(String fullyQualifiedNameOfAnnotation) {
     for (AnnotationInstance a : annotations()) {
       if (a.symbol().type().is(fullyQualifiedNameOfAnnotation)) {
-        // FIXME what about repeating annotations?
+        // TODO what about repeating annotations?
         return a.values();
       }
     }
@@ -57,27 +57,28 @@ abstract class JSymbolMetadata implements SymbolMetadata {
   }
 
   static final class JAnnotationInstance implements AnnotationInstance {
-    private final Sema ast;
-    private final IAnnotationBinding binding;
+    private final JSema ast;
+    private final IAnnotationBinding annotationBinding;
 
-    JAnnotationInstance(Sema ast, IAnnotationBinding binding) {
+    JAnnotationInstance(JSema ast, IAnnotationBinding annotationBinding) {
       this.ast = ast;
-      this.binding = binding;
+      this.annotationBinding = annotationBinding;
     }
 
     @Override
     public Symbol symbol() {
-      return ast.typeSymbol(binding.getAnnotationType());
+      return ast.typeSymbol(annotationBinding.getAnnotationType());
     }
 
     @Override
     public List<AnnotationValue> values() {
       // FIXME note that AnnotationValue.value can be Tree
       List<AnnotationValue> r = new ArrayList<>();
-      for (IMemberValuePairBinding pair : binding.getDeclaredMemberValuePairs()) {
+      for (IMemberValuePairBinding pair : annotationBinding.getDeclaredMemberValuePairs()) {
         r.add(new AnnotationValueResolve(pair.getName(), pair.getValue()));
       }
       return r;
     }
   }
+
 }

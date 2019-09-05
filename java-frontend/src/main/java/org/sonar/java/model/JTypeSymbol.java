@@ -22,11 +22,9 @@ package org.sonar.java.model;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IVariableBinding;
-import org.sonar.java.resolve.Symbols;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.semantic.Type;
 import org.sonar.plugins.java.api.tree.ClassTree;
-import org.sonar.plugins.java.api.tree.MethodsAreNonnullByDefault;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
@@ -34,52 +32,50 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
-@MethodsAreNonnullByDefault
 final class JTypeSymbol extends JSymbol implements Symbol.TypeSymbol {
 
-  JTypeSymbol(Sema sema, ITypeBinding typeBinding) {
+  JTypeSymbol(JSema sema, ITypeBinding typeBinding) {
     super(sema, typeBinding);
   }
 
-  @Nullable
-  @Override
-  public ClassTree declaration() {
-    return (ClassTree) super.declaration();
+  private ITypeBinding typeBinding() {
+    return (ITypeBinding) binding;
   }
 
   @CheckForNull
   @Override
   public Type superClass() {
-    if ("java.lang.Object".equals(((ITypeBinding) binding).getQualifiedName())) {
+    if (typeBinding().isInterface() || typeBinding().isArray()) {
+      return sema.type(Objects.requireNonNull(sema.resolveType("java.lang.Object")));
+    } else if (typeBinding().getSuperclass() == null) {
+      // java.lang.Object
       return null;
+    } else {
+      return sema.type(typeBinding().getSuperclass());
     }
-    if (((ITypeBinding) binding).getSuperclass() == null) {
-      return Symbols.unknownType;
-    }
-    return ast.type(((ITypeBinding) binding).getSuperclass());
   }
 
   @Override
   public List<Type> interfaces() {
-    return Arrays.stream(((ITypeBinding) binding).getInterfaces())
-      .map(ast::type)
+    return Arrays.stream(typeBinding().getInterfaces())
+      .map(sema::type)
       .collect(Collectors.toList());
   }
 
   @Override
   public Collection<Symbol> memberSymbols() {
     Collection<Symbol> members = new ArrayList<>();
-    ITypeBinding typeBinding = (ITypeBinding) binding;
-    for (ITypeBinding b : typeBinding.getDeclaredTypes()) {
-      members.add(ast.typeSymbol(b));
+    for (ITypeBinding b : typeBinding().getDeclaredTypes()) {
+      members.add(sema.typeSymbol(b));
     }
-    for (IVariableBinding b : typeBinding.getDeclaredFields()) {
-      members.add(ast.variableSymbol(b));
+    for (IVariableBinding b : typeBinding().getDeclaredFields()) {
+      members.add(sema.variableSymbol(b));
     }
-    for (IMethodBinding b : typeBinding.getDeclaredMethods()) {
-      members.add(ast.methodSymbol(b));
+    for (IMethodBinding b : typeBinding().getDeclaredMethods()) {
+      members.add(sema.methodSymbol(b));
     }
     // TODO old implementation also provides "this" and "super" - see AbstractClassWithoutAbstractMethodCheck
     return members;
@@ -87,10 +83,15 @@ final class JTypeSymbol extends JSymbol implements Symbol.TypeSymbol {
 
   @Override
   public Collection<Symbol> lookupSymbols(String name) {
-    // FIXME AFAIU
     return memberSymbols().stream()
-      .filter(member -> name.equals(member.name()))
-      .collect(Collectors.toList());
+      .filter(m -> name.equals(m.name()))
+      .collect(Collectors.toList()); // List vs Set should not matter
+  }
+
+  @Nullable
+  @Override
+  public ClassTree declaration() {
+    return (ClassTree) super.declaration();
   }
 
 }

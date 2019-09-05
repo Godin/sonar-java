@@ -21,6 +21,7 @@ package org.sonar.java.model.declaration;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.sonar.java.ast.parser.QualifiedIdentifierListTreeImpl;
 import org.sonar.java.ast.parser.TypeParameterListTreeImpl;
 import org.sonar.java.model.InternalSyntaxToken;
@@ -62,7 +63,9 @@ public class ClassTreeImpl extends JavaTree implements ClassTree {
   @Nullable
   private SyntaxToken implementsKeyword;
   private ListTree<TypeTree> superInterfaces;
-  private Symbol.TypeSymbol symbol = Symbols.unknownSymbol;
+  private JavaSymbol.TypeJavaSymbol symbol = Symbols.unknownSymbol;
+  @Nullable
+  public ITypeBinding typeBinding;
 
   public ClassTreeImpl(Kind kind, SyntaxToken openBraceToken, List<Tree> members, SyntaxToken closeBraceToken) {
     super(kind);
@@ -181,6 +184,11 @@ public class ClassTreeImpl extends JavaTree implements ClassTree {
 
   @Override
   public Symbol.TypeSymbol symbol() {
+    if (root.useNewSema) {
+      return typeBinding != null
+        ? root.sema.typeSymbol(typeBinding)
+        : Symbols.unknownSymbol;
+    }
     return symbol;
   }
 
@@ -203,7 +211,7 @@ public class ClassTreeImpl extends JavaTree implements ClassTree {
     visitor.visitClass(this);
   }
 
-  public void setSymbol(Symbol.TypeSymbol symbol) {
+  public void setSymbol(JavaSymbol.TypeJavaSymbol symbol) {
     Preconditions.checkState(this.symbol.equals(Symbols.unknownSymbol));
     this.symbol = symbol;
   }

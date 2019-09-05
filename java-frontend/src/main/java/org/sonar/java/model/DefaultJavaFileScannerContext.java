@@ -89,7 +89,7 @@ public class DefaultJavaFileScannerContext implements JavaFileScannerContext {
   @Nullable
   public Object getSemanticModel() {
     if (JParser.SEMA) {
-      return ((JavaTree.CompilationUnitTreeImpl) tree).ast; // TODO
+      return ((JavaTree.CompilationUnitTreeImpl) tree).sema; // TODO
     }
     return semanticModel;
   }

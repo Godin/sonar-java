@@ -22,11 +22,12 @@ package org.sonar.java.model.declaration;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.sonar.java.model.InternalSyntaxToken;
 import org.sonar.java.model.JavaTree;
 import org.sonar.java.model.expression.IdentifierTreeImpl;
 import org.sonar.java.resolve.JavaSymbol;
-import org.sonar.plugins.java.api.semantic.Symbol;
+import org.sonar.java.resolve.Symbols;
 import org.sonar.plugins.java.api.tree.ExpressionTree;
 import org.sonar.plugins.java.api.tree.IdentifierTree;
 import org.sonar.plugins.java.api.tree.InferedTypeTree;
@@ -54,7 +55,9 @@ public class VariableTreeImpl extends JavaTree implements VariableTree {
   private SyntaxToken endToken;
 
   // FIXME(Godin): never should be null, i.e. should have default value
-  private Symbol symbol;
+  private JavaSymbol.VariableJavaSymbol symbol;
+
+  public IVariableBinding variableBinding;
 
   // Syntax tree holders
   @Nullable
@@ -192,6 +195,11 @@ public class VariableTreeImpl extends JavaTree implements VariableTree {
 
   @Override
   public org.sonar.plugins.java.api.semantic.Symbol symbol() {
+    if (root.useNewSema) {
+      return variableBinding != null
+        ? root.sema.variableSymbol(variableBinding)
+        : Symbols.unknownSymbol;
+    }
     return symbol;
   }
 
@@ -201,10 +209,10 @@ public class VariableTreeImpl extends JavaTree implements VariableTree {
   }
 
   public JavaSymbol.VariableJavaSymbol getSymbol() {
-    return (JavaSymbol.VariableJavaSymbol) symbol;
+    return symbol;
   }
 
-  public void setSymbol(Symbol symbol) {
+  public void setSymbol(JavaSymbol.VariableJavaSymbol symbol) {
     Preconditions.checkState(this.symbol == null);
     this.symbol = symbol;
     // also set the symbol to the variable identifier, or it would remain unknown

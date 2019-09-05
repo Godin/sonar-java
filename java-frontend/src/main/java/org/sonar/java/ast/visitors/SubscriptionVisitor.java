@@ -19,7 +19,6 @@
  */
 package org.sonar.java.ast.visitors;
 
-import org.sonar.java.model.JParser;
 import org.sonar.java.model.JavaTree;
 import org.sonar.java.resolve.SemanticModel;
 import org.sonar.plugins.java.api.JavaFileScanner;

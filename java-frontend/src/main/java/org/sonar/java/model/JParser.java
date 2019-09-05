@@ -21,7 +21,6 @@ package org.sonar.java.model;
 
 import com.sonar.sslr.api.RecognitionException;
 import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.compiler.CategorizedProblem;
 import org.eclipse.jdt.core.compiler.IProblem;
 import org.eclipse.jdt.core.compiler.InvalidInputException;
 import org.eclipse.jdt.core.dom.AST;
@@ -64,7 +63,6 @@ import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.ForStatement;
 import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
-import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.IfStatement;
@@ -200,8 +198,6 @@ import org.sonar.java.model.statement.SynchronizedStatementTreeImpl;
 import org.sonar.java.model.statement.ThrowStatementTreeImpl;
 import org.sonar.java.model.statement.TryStatementTreeImpl;
 import org.sonar.java.model.statement.WhileStatementTreeImpl;
-import org.sonar.java.resolve.Symbols;
-import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.tree.AnnotationTree;
 import org.sonar.plugins.java.api.tree.ArrayDimensionTree;
 import org.sonar.plugins.java.api.tree.ArrayTypeTree;
@@ -211,13 +207,11 @@ import org.sonar.plugins.java.api.tree.ExpressionTree;
 import org.sonar.plugins.java.api.tree.IdentifierTree;
 import org.sonar.plugins.java.api.tree.ImportClauseTree;
 import org.sonar.plugins.java.api.tree.InferedTypeTree;
-import org.sonar.plugins.java.api.tree.MemberSelectExpressionTree;
 import org.sonar.plugins.java.api.tree.Modifier;
 import org.sonar.plugins.java.api.tree.ModifierTree;
 import org.sonar.plugins.java.api.tree.ModuleDeclarationTree;
 import org.sonar.plugins.java.api.tree.ModuleDirectiveTree;
 import org.sonar.plugins.java.api.tree.PackageDeclarationTree;
-import org.sonar.plugins.java.api.tree.ParameterizedTypeTree;
 import org.sonar.plugins.java.api.tree.StatementTree;
 import org.sonar.plugins.java.api.tree.SyntaxTrivia;
 import org.sonar.plugins.java.api.tree.Tree;
@@ -251,7 +245,12 @@ public class JParser {
    * @param unitName see {@link ASTParser#setUnitName(String)}
    * @throws RecognitionException in case of syntax errors
    */
-  public static CompilationUnitTree parse(String version, String unitName, String source, List<File> classpath) {
+  public static CompilationUnitTree parse(
+    String version,
+    String unitName,
+    String source,
+    List<File> classpath
+  ) {
     ASTParser astParser = ASTParser.newParser(AST.JLS12);
     Map<String, String> options = new HashMap<>();
     options.put(JavaCore.COMPILER_COMPLIANCE, version);
@@ -281,25 +280,22 @@ public class JParser {
 
       System.err.println(problem.getSourceLineNumber() + ": " + problem.getMessage());
 
-      if (((CategorizedProblem) problem).getCategoryID() != CategorizedProblem.CAT_SYNTAX) {
+      if ((problem.getID() & IProblem.Syntax) == 0) {
         continue;
       }
-
       final int line = problem.getSourceLineNumber();
       final int column = astNode.getColumnNumber(problem.getSourceStart());
       throw new RecognitionException(line, "Parse error at line " + line + " column " + column + ": " + problem.getMessage());
     }
 
     JParser converter = new JParser();
+    converter.sema = new JSema(astNode.getAST());
     converter.compilationUnit = astNode;
     converter.tokenManager = new TokenManager(lex(version, unitName, sourceChars), source, new DefaultCodeFormatterOptions(new HashMap<>()));
-    converter.ast = new Sema(astNode.getAST());
 
-    CompilationUnitTree tree = converter.convertCompilationUnit(astNode);
+    JavaTree.CompilationUnitTreeImpl tree = converter.convertCompilationUnit(astNode);
+    tree.sema = converter.sema;
     setParents(tree);
-
-    ((JavaTree.CompilationUnitTreeImpl) tree).ast = converter.ast;
-
     return tree;
   }
 
@@ -349,9 +345,25 @@ public class JParser {
   }
 
   private CompilationUnit compilationUnit;
-  private Sema ast;
 
   private TokenManager tokenManager;
+
+  private JSema sema;
+
+  private void declaration(@Nullable IBinding binding, Tree node) {
+    if (binding == null) {
+      return;
+    }
+    sema.declarations.put(binding, node);
+  }
+
+  private void usage(@Nullable IBinding binding, IdentifierTree node) {
+    if (binding == null) {
+      return;
+    }
+    sema.usages.computeIfAbsent(binding, k -> new ArrayList<>())
+      .add(node);
+  }
 
   private int firstTokenIndexAfter(ASTNode e) {
     int index = tokenManager.firstIndexAfter(e, ANY_TOKEN);
@@ -475,7 +487,7 @@ public class JParser {
     }
   }
 
-  private CompilationUnitTree convertCompilationUnit(CompilationUnit e) {
+  private JavaTree.CompilationUnitTreeImpl convertCompilationUnit(CompilationUnit e) {
     PackageDeclarationTree packageDeclaration = null;
     if (e.getPackage() != null) {
       packageDeclaration = new JavaTree.PackageDeclarationTreeImpl(
@@ -711,14 +723,6 @@ public class JParser {
     ).completeModifiers(
       convertModifiers(e.modifiers())
     );
-    if (SEMA)
-    if (e.resolveBinding() != null) {
-      t.setSymbol(ast.typeSymbol(e.resolveBinding()));
-      ast.declaration(e.resolveBinding(), t);
-    } else {
-      t.setSymbol(Symbols.unknownSymbol);
-    }
-
     switch (kind) {
       default:
         break;
@@ -786,6 +790,10 @@ public class JParser {
         break;
       }
     }
+
+    t.typeBinding = e.resolveBinding();
+    declaration(t.typeBinding, t);
+
     return t;
   }
 
@@ -832,14 +840,9 @@ public class JParser {
         break;
     }
 
-    IdentifierTree identifier = convertSimpleName(e.getName()); // !!!
-    if (SEMA)
-    ((IdentifierTreeImpl) identifier).setSymbol(
-      methodSymbol(e.resolveConstructorBinding())
-    );
-    if (e.resolveConstructorBinding() != null) {
-      usage(e.resolveConstructorBinding(), identifier);
-    }
+    IdentifierTree identifier = convertSimpleName(e.getName());
+    ((IdentifierTreeImpl) identifier).binding = e.resolveConstructorBinding();
+    usage(e.resolveConstructorBinding(), identifier);
 
     NewClassTreeImpl initializer = new NewClassTreeImpl(
       arguments,
@@ -847,8 +850,7 @@ public class JParser {
     ).completeWithIdentifier(
       identifier
     );
-    if (SEMA)
-    initializer.setType(identifier.symbolType()); // TODO same as in old implementation, but doesn't look right
+    initializer.typeBinding = ((IdentifierTreeImpl) identifier).typeBinding; // TODO same as in old implementation, but doesn't look right
 
     return new EnumConstantTreeImpl(
       convertModifiers(e.modifiers()),
@@ -887,13 +889,8 @@ public class JParser {
         ).completeWithModifiers(
           convertModifiers(e.modifiers())
         );
-        if (SEMA)
-        if (e.resolveBinding() != null) {
-          t.setSymbol(ast.methodSymbol(e.resolveBinding()));
-          ast.declaration(e.resolveBinding(), t);
-        } else {
-          t.setSymbol(Symbols.unknownMethodSymbol);
-        }
+        t.methodBinding = e.resolveBinding();
+        declaration(t.methodBinding, t);
         members.add(t);
         lastTokenIndex = tokenManager.lastIndexIn(node, TerminalTokens.TokenNameSEMICOLON);
         break;
@@ -959,13 +956,9 @@ public class JParser {
         ).completeWithTypeParameters(
           convertTypeParameters(e.typeParameters())
         );
-        if (SEMA)
-        if (e.resolveBinding() != null) {
-          t.setSymbol(ast.methodSymbol(e.resolveBinding()));
-          ast.declaration(e.resolveBinding(), t);
-        } else {
-          t.setSymbol(Symbols.unknownMethodSymbol);
-        }
+        t.methodBinding = e.resolveBinding();
+        declaration(t.methodBinding, t);
+
         members.add(t);
         lastTokenIndex = tokenManager.lastIndexIn(node, e.getBody() == null ? TerminalTokens.TokenNameSEMICOLON : TerminalTokens.TokenNameRBRACE);
         break;
@@ -983,13 +976,6 @@ public class JParser {
             modifiers,
             applyExtraDimensions(type, fragment.extraDimensions())
           );
-          if (SEMA)
-          if (fragment.resolveBinding() != null) {
-            t.setSymbol(ast.variableSymbol(fragment.resolveBinding()));
-            ast.declaration(fragment.resolveBinding(), t);
-          } else {
-            t.setSymbol(Symbols.unknownSymbol); // TODO wtf?
-          }
           if (fragment.getInitializer() != null) {
             t.completeTypeAndInitializer(
               t.type(),
@@ -1001,6 +987,8 @@ public class JParser {
           t.setEndToken(
             firstTokenAfter(fragment, i + 1 < fieldDeclaration.fragments().size() ? TerminalTokens.TokenNameCOMMA : TerminalTokens.TokenNameSEMICOLON)
           );
+          t.variableBinding = fragment.resolveBinding();
+          declaration(t.variableBinding, t);
 
           members.add(t);
         }
@@ -1111,14 +1099,22 @@ public class JParser {
    * @param extraDimensions list of {@link org.eclipse.jdt.core.dom.Dimension}
    */
   private TypeTree applyExtraDimensions(TypeTree type, List extraDimensions) {
-    for (Object o : extraDimensions) {
-      Dimension e = (Dimension) o;
+    if (type == null) {
+      // e.g. return type of constructor
+      return null;
+    }
+    ITypeBinding typeBinding = ((AbstractTypedTree) type).typeBinding;
+    for (int i = 0; i < extraDimensions.size(); i++) {
+      Dimension e = (Dimension) extraDimensions.get(i);
       type = new JavaTree.ArrayTypeTreeImpl(
         type,
         (List) convertAnnotations(e.annotations()),
         firstTokenIn(e, TerminalTokens.TokenNameLBRACKET),
         firstTokenIn(e, TerminalTokens.TokenNameRBRACKET)
       );
+      if (typeBinding != null) {
+        ((JavaTree.ArrayTypeTreeImpl) type).typeBinding = typeBinding.createArrayType(i + 1);
+      }
     }
     return type;
   }
@@ -1128,11 +1124,15 @@ public class JParser {
     TypeTree type = convertType(e.getType());
     type = applyExtraDimensions(type, e.extraDimensions());
     if (e.isVarargs()) {
+      ITypeBinding typeBinding = ((AbstractTypedTree) type).typeBinding;
       type = new JavaTree.ArrayTypeTreeImpl(
         type,
         (List) convertAnnotations(e.varargsAnnotations()),
         firstTokenAfter(e.getType(), TerminalTokens.TokenNameELLIPSIS)
       );
+      if (typeBinding != null) {
+        ((JavaTree.ArrayTypeTreeImpl) type).typeBinding = typeBinding.createArrayType(1);
+      }
     }
 
     VariableTreeImpl t = new VariableTreeImpl(
@@ -1148,13 +1148,8 @@ public class JParser {
         convertExpression(e.getInitializer())
       );
     }
-    if (SEMA)
-    if (e.resolveBinding() != null) {
-      ast.declaration(e.resolveBinding(), t);
-      t.setSymbol(ast.variableSymbol(e.resolveBinding()));
-    } else {
-      t.setSymbol(Symbols.unknownSymbol); // TODO wtf?
-    }
+    t.variableBinding = e.resolveBinding();
+    declaration(t.variableBinding, t);
     return t;
   }
 
@@ -1178,15 +1173,8 @@ public class JParser {
       if (i < e2.fragments().size() - 1) {
         t.setEndToken(firstTokenAfter(fragment, TerminalTokens.TokenNameCOMMA));
       }
-
-      if (SEMA)
-      if (fragment.resolveBinding() == null) {
-        t.setSymbol(Symbols.unknownSymbol);
-      } else {
-        t.setSymbol(ast.variableSymbol(fragment.resolveBinding()));
-        ast.declaration(fragment.resolveBinding(), t);
-      }
-
+      t.variableBinding = fragment.resolveBinding();
+      declaration(t.variableBinding, t);
       list.add(t);
     }
   }
@@ -1199,24 +1187,8 @@ public class JParser {
     IdentifierTreeImpl t = new IdentifierTreeImpl(
       firstTokenIn(e, TerminalTokens.TokenNameIdentifier)
     );
-    if (SEMA)
-    t.setType(type(e.resolveTypeBinding()));
-    if (SEMA)
-    if (e.resolveBinding() != null) {
-      switch (e.resolveBinding().getKind()) {
-        case IBinding.TYPE:
-          t.setSymbol(ast.typeSymbol((ITypeBinding) e.resolveBinding()));
-          break;
-        case IBinding.METHOD:
-          t.setSymbol(ast.methodSymbol((IMethodBinding) e.resolveBinding()));
-          break;
-        case IBinding.VARIABLE:
-          t.setSymbol(ast.variableSymbol((IVariableBinding) e.resolveBinding()));
-          break;
-      }
-    } else {
-      t.setSymbol(Symbols.unknownSymbol);
-    }
+    t.typeBinding = e.resolveTypeBinding();
+    t.binding = e.resolveBinding();
     return t;
   }
 
@@ -1250,13 +1222,6 @@ public class JParser {
         ).completeModifiers(
           modifiers
         );
-        if (SEMA)
-        if (fragment.resolveBinding() != null) {
-          t.setSymbol(ast.variableSymbol(fragment.resolveBinding()));
-          ast.declaration(fragment.resolveBinding(), t);
-        } else {
-          t.setSymbol(Symbols.unknownSymbol); // TODO wtf?
-        }
         if (fragment.getInitializer() != null) {
           t.completeTypeAndInitializer(
             t.type(),
@@ -1267,6 +1232,8 @@ public class JParser {
         t.setEndToken(
           firstTokenAfter(fragment, i < e.fragments().size() - 1 ? TerminalTokens.TokenNameCOMMA : TerminalTokens.TokenNameSEMICOLON)
         );
+        t.variableBinding = fragment.resolveBinding();
+        declaration(t.variableBinding, t);
         statements.add(t);
       }
     } else if (node.getNodeType() == ASTNode.BREAK_STATEMENT && node.getLength() == 0) {
@@ -1569,17 +1536,19 @@ public class JParser {
           lastTokenIn(e, TerminalTokens.TokenNameRPAREN)
         );
 
+        IdentifierTreeImpl i = new IdentifierTreeImpl(e.arguments().isEmpty()
+          ? lastTokenIn(e, TerminalTokens.TokenNamethis)
+          : firstTokenBefore((ASTNode) e.arguments().get(0), TerminalTokens.TokenNamethis));
+        i.binding = e.resolveConstructorBinding();
         MethodInvocationTreeImpl t = new MethodInvocationTreeImpl(
-          new IdentifierTreeImpl(e.arguments().isEmpty()
-            ? lastTokenIn(e, TerminalTokens.TokenNamethis)
-            : firstTokenBefore((ASTNode) e.arguments().get(0), TerminalTokens.TokenNamethis)),
+          i,
           convertTypeArguments(e.typeArguments()),
           arguments
         );
 
-        if (SEMA) {
-          t.setSymbol(methodSymbol(e.resolveConstructorBinding()));
-          t.setType(t.symbol().owner().type());
+        t.methodBinding = e.resolveConstructorBinding();
+        if (t.methodBinding != null) {
+          t.typeBinding = t.methodBinding.getDeclaringClass();
         }
 
         return new ExpressionStatementTreeImpl(
@@ -1591,8 +1560,7 @@ public class JParser {
         SuperConstructorInvocation e = (SuperConstructorInvocation) node;
 
         ExpressionTree methodSelect = new IdentifierTreeImpl(firstTokenIn(e, TerminalTokens.TokenNamesuper));
-        if (SEMA)
-        ((IdentifierTreeImpl) methodSelect).setSymbol(methodSymbol(e.resolveConstructorBinding()));
+        ((IdentifierTreeImpl) methodSelect).binding = e.resolveConstructorBinding();
 
         if (e.getExpression() != null) {
           methodSelect = new MemberSelectExpressionTreeImpl(
@@ -1613,10 +1581,11 @@ public class JParser {
           convertTypeArguments(e.typeArguments()),
           arguments
         );
-
-        if (SEMA) {
-          t.setSymbol(methodSymbol(e.resolveConstructorBinding()));
-          t.setType(t.symbol().owner().type());
+        t.methodBinding = e.resolveConstructorBinding();
+        if (t.methodBinding != null) {
+          // TODO check JSymbol: t.methodBinding.getDeclaringClass().isAnonymous()
+          // type - is class that declares constructor, i.e. supertype
+          t.typeBinding = t.methodBinding.getDeclaringClass();
         }
 
         return new ExpressionStatementTreeImpl(
@@ -1679,9 +1648,7 @@ public class JParser {
     }
     ExpressionTree t = createExpression(node);
     if (!t.is(Tree.Kind.SWITCH_EXPRESSION)) {
-      // FIXME in UseSwitchExpressionCheck ClassCastException: class org.sonar.java.model.statement.SwitchExpressionTreeImpl cannot be cast to class org.sonar.java.model.AbstractTypedTree
-      if (SEMA)
-      ((AbstractTypedTree) t).setType(type(node.resolveTypeBinding()));
+      ((AbstractTypedTree) t).typeBinding = node.resolveTypeBinding();
     }
     return t;
   }
@@ -1692,14 +1659,14 @@ public class JParser {
         throw new IllegalStateException(ASTNode.nodeClassForType(node.getNodeType()).toString());
       case ASTNode.SIMPLE_NAME: {
         SimpleName e = (SimpleName) node;
-        IdentifierTree t = convertSimpleName(e);
-        usage(e.resolveBinding(), t);
+        IdentifierTreeImpl t = convertSimpleName(e);
+        usage(t.binding, t);
         return t;
       }
       case ASTNode.QUALIFIED_NAME: {
         QualifiedName e = (QualifiedName) node;
         IdentifierTreeImpl rhs = convertSimpleName(e.getName());
-        usage(e.getName().resolveBinding(), rhs);
+        usage(rhs.binding, rhs);
         return new MemberSelectExpressionTreeImpl(
           convertExpression(e.getQualifier()),
           firstTokenAfter(e.getQualifier(), TerminalTokens.TokenNameDOT),
@@ -1709,7 +1676,7 @@ public class JParser {
       case ASTNode.FIELD_ACCESS: {
         FieldAccess e = (FieldAccess) node;
         IdentifierTreeImpl rhs = convertSimpleName(e.getName());
-        usage(e.getName().resolveBinding(), rhs);
+        usage(rhs.binding, rhs);
         return new MemberSelectExpressionTreeImpl(
           convertExpression(e.getExpression()),
           firstTokenAfter(e.getExpression(), TerminalTokens.TokenNameDOT),
@@ -1719,7 +1686,7 @@ public class JParser {
       case ASTNode.SUPER_FIELD_ACCESS: {
         SuperFieldAccess e = (SuperFieldAccess) node;
         IdentifierTreeImpl rhs = convertSimpleName(e.getName());
-        usage(e.getName().resolveBinding(), rhs);
+        usage(rhs.binding, rhs);
         if (e.getQualifier() == null) {
           // super.name
           return new MemberSelectExpressionTreeImpl(
@@ -1914,16 +1881,8 @@ public class JParser {
             members,
             lastTokenIn(e.getAnonymousClassDeclaration(), TerminalTokens.TokenNameRBRACE)
           );
-
-          if (SEMA)
-          classBody.setSymbol(
-            typeSymbol(e.getAnonymousClassDeclaration().resolveBinding())
-          );
-          if (e.getAnonymousClassDeclaration().resolveBinding() != null) {
-            ast.declaration(
-              e.getAnonymousClassDeclaration().resolveBinding(), classBody
-            );
-          }
+          classBody.typeBinding = e.getAnonymousClassDeclaration().resolveBinding();
+          declaration(classBody.typeBinding, classBody);
         }
 
         NewClassTreeImpl t = new NewClassTreeImpl( // FIXME setType of body or name?
@@ -1936,17 +1895,16 @@ public class JParser {
         ).completeWithTypeArguments(
           convertTypeArguments(e.typeArguments())
         );
-
-        // identifier should be bound to constructor and not to type - see CallToDeprecatedMethodCheck
-        if (SEMA)
-        ((IdentifierTreeImpl) getIdentifier(t.identifier())).setSymbol(
-          methodSymbol(e.resolveConstructorBinding())
-        );
-
         if (e.getExpression() != null) {
           t.completeWithEnclosingExpression(convertExpression(e.getExpression()));
           t.completeWithDotToken(firstTokenAfter(e.getExpression(), TerminalTokens.TokenNameDOT));
         }
+
+        // TODO test "usages" of identifier in old implementation
+        // TODO test in case of anonymous class declaration
+        IdentifierTreeImpl identifier = (IdentifierTreeImpl) t.getConstructorIdentifier();
+        identifier.binding = e.resolveConstructorBinding();
+
         return t;
       }
       case ASTNode.CONDITIONAL_EXPRESSION: {
@@ -1971,6 +1929,7 @@ public class JParser {
         );
         for (Object o : e.extendedOperands()) {
           Expression e2 = (Expression) o;
+          t.typeBinding = e.resolveTypeBinding();
           t = new BinaryExpressionTreeImpl(
             op.kind,
             t,
@@ -1989,13 +1948,13 @@ public class JParser {
           lastTokenIn(e, TerminalTokens.TokenNameRPAREN)
         );
 
+        IdentifierTreeImpl rhs = convertSimpleName(e.getName());
+        usage(rhs.binding, rhs);
+
         ExpressionTree memberSelect;
         if (e.getExpression() == null) {
-          memberSelect = convertSimpleName(e.getName());
-          usage(e.getName().resolveBinding(), (IdentifierTree) memberSelect);
+          memberSelect = rhs;
         } else {
-          IdentifierTreeImpl rhs = convertSimpleName(e.getName());
-          usage(e.getName().resolveBinding(), rhs);
           memberSelect = new MemberSelectExpressionTreeImpl(
             convertExpression(e.getExpression()),
             firstTokenAfter(e.getExpression(), TerminalTokens.TokenNameDOT),
@@ -2007,10 +1966,7 @@ public class JParser {
           convertTypeArguments(e.typeArguments()),
           arguments
         );
-
-        if (SEMA)
-        t.setSymbol(methodSymbol(e.resolveMethodBinding()));
-
+        t.methodBinding = e.resolveMethodBinding();
         return t;
       }
       case ASTNode.SUPER_METHOD_INVOCATION: {
@@ -2023,7 +1979,7 @@ public class JParser {
         );
 
         IdentifierTreeImpl rhs = convertSimpleName(e.getName());
-        usage(e.getName().resolveBinding(), rhs);
+        usage(rhs.binding, rhs);
 
         ExpressionTree outermostSelect;
         if (e.getQualifier() == null) {
@@ -2044,15 +2000,13 @@ public class JParser {
             rhs
           );
         }
+
         MethodInvocationTreeImpl t = new MethodInvocationTreeImpl(
           outermostSelect,
           null,
           arguments
         );
-
-        if (SEMA)
-        t.setSymbol(methodSymbol(e.resolveMethodBinding()));
-
+        t.methodBinding = e.resolveMethodBinding();
         return t;
       }
       case ASTNode.PARENTHESIZED_EXPRESSION: {
@@ -2098,18 +2052,11 @@ public class JParser {
           VariableTreeImpl t;
           if (o.getNodeType() == ASTNode.VARIABLE_DECLARATION_FRAGMENT) {
             t = new VariableTreeImpl(convertSimpleName(o.getName()));
-            if (SEMA)
-            if (o.resolveBinding() != null) {
-              ((InferedTypeTree) t.type()).setType(
-                type(o.resolveBinding().getType())
-              );
-              t.setSymbol(ast.variableSymbol(o.resolveBinding()));
-              ast.declaration(o.resolveBinding(), t);
-            } else {
-              ((InferedTypeTree) t.type()).setType(
-                Symbols.unknownType
-              );
-              t.setSymbol(Symbols.unknownSymbol);
+            IVariableBinding variableBinding = o.resolveBinding();
+            if (variableBinding != null) {
+              t.variableBinding = variableBinding;
+              ((InferedTypeTree) t.type()).typeBinding = variableBinding.getType();
+              declaration(t.variableBinding, t);
             }
           } else {
             t = createVariable((SingleVariableDeclaration) o);
@@ -2237,6 +2184,7 @@ public class JParser {
             result = new LiteralTreeImpl(Tree.Kind.DOUBLE_LITERAL, createSyntaxToken(tokenIndex));
             break;
         }
+        ((LiteralTreeImpl) result).typeBinding = e.resolveTypeBinding();
         if (unaryMinus) {
           result = new InternalPrefixUnaryExpression(Tree.Kind.UNARY_MINUS, createSyntaxToken(tokenIndex - 1), result);
         }
@@ -2287,9 +2235,7 @@ public class JParser {
               firstTokenAfter(o.getName(), TerminalTokens.TokenNameEQUAL),
               convertExpression(o.getValue())
             );
-            t.setType(
-              t.variable().symbolType() // TODO check old implementation
-            );
+            t.typeBinding = ((AbstractTypedTree) t.variable()).typeBinding; // TODO check old implementation
             arguments.add(t);
             if (i < ((NormalAnnotation) e).values().size() - 1) {
               arguments.separators().add(
@@ -2308,22 +2254,6 @@ public class JParser {
           arguments
         );
       }
-    }
-  }
-
-  /**
-   * @see NewClassTreeImpl#constructorSymbol()
-   */
-  private IdentifierTree getIdentifier(TypeTree t) {
-    switch (t.kind()) {
-      default:
-        throw new IllegalStateException(t.kind().toString());
-      case IDENTIFIER:
-        return (IdentifierTree) t;
-      case MEMBER_SELECT:
-        return ((MemberSelectExpressionTree) t).identifier();
-      case PARAMETERIZED_TYPE:
-        return getIdentifier(((ParameterizedTypeTree) t).type());
     }
   }
 
@@ -2372,10 +2302,7 @@ public class JParser {
         t.complete(
           convertAnnotations(e.annotations())
         );
-
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
-
+        t.typeBinding = e.resolveBinding();
         return t;
       }
       case ASTNode.SIMPLE_TYPE: {
@@ -2390,11 +2317,11 @@ public class JParser {
         if (t instanceof IdentifierTree && ((IdentifierTree) t).name().equals("var")) {
           // TODO can't be annotated?
           VarTypeTreeImpl t2 = new VarTypeTreeImpl((InternalSyntaxToken) ((IdentifierTree) t).identifierToken());
-          if (SEMA)
-          t2.setType(type(e.resolveBinding()));
+          t2.typeBinding = e.resolveBinding();
           return t2;
         }
         t.complete(annotations);
+        // typeBinding is assigned by convertExpression
         return t;
       }
       case ASTNode.UNION_TYPE: {
@@ -2410,13 +2337,12 @@ public class JParser {
           }
         }
         JavaTree.UnionTypeTreeImpl t = new JavaTree.UnionTypeTreeImpl(alternatives);
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
+        t.typeBinding = e.resolveBinding();
         return t;
       }
       case ASTNode.ARRAY_TYPE: {
         ArrayType e = (ArrayType) node;
-        ITypeBinding binding = e.getElementType().resolveBinding();
+        @Nullable ITypeBinding elementTypeBinding = e.getElementType().resolveBinding();
         TypeTree t = convertType(e.getElementType());
         int tokenIndex = tokenManager.firstIndexAfter(e.getElementType(), TerminalTokens.TokenNameLBRACKET);
         for (int i = 0; i < e.dimensions().size(); i++) {
@@ -2429,10 +2355,9 @@ public class JParser {
             createSyntaxToken(tokenIndex),
             createSyntaxToken(nextTokenIndex(tokenIndex, TerminalTokens.TokenNameRBRACKET))
           );
-          if (SEMA)
-          ((AbstractTypedTree) t).setType(
-            binding != null ? type(binding.createArrayType(i + 1)) : Symbols.unknownType
-          );
+          if (elementTypeBinding != null) {
+            ((JavaTree.ArrayTypeTreeImpl) t).typeBinding = elementTypeBinding.createArrayType(i + 1);
+          }
         }
         return t;
       }
@@ -2453,8 +2378,7 @@ public class JParser {
             )
           )
         );
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
+        t.typeBinding = e.resolveBinding();
         return t;
       }
       case ASTNode.QUALIFIED_TYPE: {
@@ -2467,8 +2391,7 @@ public class JParser {
         ((IdentifierTreeImpl) t.identifier()).complete(
           convertAnnotations(e.annotations())
         );
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
+        t.typeBinding = e.resolveBinding();
         return t;
       }
       case ASTNode.NAME_QUALIFIED_TYPE: {
@@ -2481,8 +2404,7 @@ public class JParser {
         ((IdentifierTreeImpl) t.identifier()).complete(
           convertAnnotations(e.annotations())
         );
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
+        t.typeBinding = e.resolveBinding();
         return t;
       }
       case ASTNode.WILDCARD_TYPE: {
@@ -2507,8 +2429,7 @@ public class JParser {
         t.complete(
           convertAnnotations(e.annotations())
         );
-        if (SEMA)
-        t.setType(type(e.resolveBinding()));
+        t.typeBinding = e.resolveBinding();
         return t;
       }
     }
@@ -2571,33 +2492,6 @@ public class JParser {
             return new ModifierKeywordTreeImpl(Modifier.DEFAULT, firstTokenIn(e, TerminalTokens.TokenNamedefault));
         }
       }
-    }
-  }
-
-  private Symbol.TypeSymbol typeSymbol(@Nullable ITypeBinding binding) {
-    if (binding == null) {
-      return Symbols.unknownSymbol;
-    }
-    return ast.typeSymbol(binding);
-  }
-
-  private Symbol.MethodSymbol methodSymbol(@Nullable IMethodBinding binding) {
-    if (binding == null) {
-      return Symbols.unknownMethodSymbol;
-    }
-    return ast.methodSymbol(binding);
-  }
-
-  private org.sonar.plugins.java.api.semantic.Type type(@Nullable ITypeBinding binding) {
-    if (binding == null) {
-      return Symbols.unknownType;
-    }
-    return ast.type(binding);
-  }
-
-  private void usage(@Nullable IBinding binding, IdentifierTree t) {
-    if (binding != null) {
-      ast.usage(binding, t);
     }
   }
 

@@ -21,15 +21,13 @@ package org.sonar.java.model;
 
 import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.sonar.plugins.java.api.semantic.Symbol;
-import org.sonar.plugins.java.api.tree.MethodsAreNonnullByDefault;
 import org.sonar.plugins.java.api.tree.VariableTree;
 
 import javax.annotation.Nullable;
 
-@MethodsAreNonnullByDefault
 final class JVariableSymbol extends JSymbol implements Symbol.VariableSymbol {
 
-  JVariableSymbol(Sema sema, IVariableBinding variableBinding) {
+  JVariableSymbol(JSema sema, IVariableBinding variableBinding) {
     super(sema, variableBinding);
   }
 

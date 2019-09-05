@@ -23,12 +23,6 @@
             <groupId>org.eclipse.platform</groupId>
             <artifactId>org.eclipse.core.filesystem</artifactId>
           </exclusion>
-          <!--
-          <exclusion>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.text</artifactId>
-          </exclusion>
-          -->
           <exclusion>
             <groupId>org.eclipse.platform</groupId>
             <artifactId>org.eclipse.core.expressions</artifactId>
@@ -77,6 +71,17 @@
         <groupId>org.eclipse.platform</groupId>
         <artifactId>org.eclipse.core.contenttype</artifactId>
         <version>3.7.300</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.platform</groupId>
+        <artifactId>org.eclipse.text</artifactId>
+        <version>3.8.200</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.eclipse.platform</groupId>
+            <artifactId>org.eclipse.core.commands</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>

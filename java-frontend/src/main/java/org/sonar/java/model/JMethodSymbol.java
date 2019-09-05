@@ -25,7 +25,6 @@ import org.eclipse.jdt.internal.compiler.lookup.MethodBinding;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.semantic.Type;
 import org.sonar.plugins.java.api.tree.MethodTree;
-import org.sonar.plugins.java.api.tree.MethodsAreNonnullByDefault;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
@@ -33,38 +32,36 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-@MethodsAreNonnullByDefault
 final class JMethodSymbol extends JSymbol implements Symbol.MethodSymbol {
 
-  JMethodSymbol(Sema sema, IMethodBinding methodBinding) {
+  JMethodSymbol(JSema sema, IMethodBinding methodBinding) {
     super(sema, methodBinding);
   }
 
-  @Nullable
-  @Override
-  public MethodTree declaration() {
-    return (MethodTree) super.declaration();
+  private IMethodBinding methodBinding() {
+    return (IMethodBinding) binding;
   }
 
   @Override
   public List<Type> parameterTypes() {
-    return Arrays.stream(((IMethodBinding) binding).getParameterTypes())
-      .map(ast::type)
+    return Arrays.stream(methodBinding().getParameterTypes())
+      .map(sema::type)
       .collect(Collectors.toList());
   }
 
   @Override
   public TypeSymbol returnType() {
-    return ast.typeSymbol(((IMethodBinding) binding).getReturnType());
+    return sema.typeSymbol(methodBinding().getReturnType());
   }
 
   @Override
   public List<Type> thrownTypes() {
-    return Arrays.stream(((IMethodBinding) binding).getExceptionTypes())
-      .map(ast::type)
+    return Arrays.stream(methodBinding().getExceptionTypes())
+      .map(sema::type)
       .collect(Collectors.toList());
   }
 
@@ -73,36 +70,34 @@ final class JMethodSymbol extends JSymbol implements Symbol.MethodSymbol {
   public MethodSymbol overriddenSymbol() {
     // TODO what about unresolved?
     IMethodBinding overrides = find(
-      ast,
-      ((IMethodBinding) binding)::overrides,
-      ((IMethodBinding) binding).getDeclaringClass()
+      methodBinding()::overrides,
+      methodBinding().getDeclaringClass()
     );
-    if (overrides != null) {
-      return ast.methodSymbol(overrides);
+    if (overrides == null) {
+      return null;
     }
-    return null;
+    return sema.methodSymbol(overrides);
   }
 
   @Nullable
-  private static IMethodBinding find(Sema ctx, Predicate<IMethodBinding> predicate, ITypeBinding t) {
+  private IMethodBinding find(Predicate<IMethodBinding> predicate, ITypeBinding t) {
     for (IMethodBinding candidate : t.getDeclaredMethods()) {
       if (predicate.test(candidate)) {
         return candidate;
       }
     }
     for (ITypeBinding i : t.getInterfaces()) {
-      IMethodBinding r = find(ctx, predicate, i);
+      IMethodBinding r = find(predicate, i);
       if (r != null) {
         return r;
       }
     }
     if (t.getSuperclass() != null) {
-      return find(ctx, predicate, t.getSuperclass());
-    } else {
-      ITypeBinding objectType = ctx.ast.resolveWellKnownType("java.lang.Object");
-      if (t != objectType) {
-        return find(ctx, predicate, objectType);
-      }
+      return find(predicate, t.getSuperclass());
+    }
+    ITypeBinding objectTypeBinding = Objects.requireNonNull(sema.resolveType("java.lang.Object"));
+    if (t != objectTypeBinding) {
+      return find(predicate, objectTypeBinding);
     }
     return null;
   }
@@ -124,6 +119,12 @@ final class JMethodSymbol extends JSymbol implements Symbol.MethodSymbol {
     } catch (NoSuchMethodException | NoSuchFieldException | ClassNotFoundException | IllegalAccessException | InvocationTargetException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  @Nullable
+  @Override
+  public MethodTree declaration() {
+    return (MethodTree) super.declaration();
   }
 
 }

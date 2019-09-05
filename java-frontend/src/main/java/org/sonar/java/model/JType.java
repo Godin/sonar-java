@@ -25,18 +25,16 @@ import org.sonar.java.resolve.JavaType;
 import org.sonar.java.resolve.MethodJavaType;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.semantic.Type;
-import org.sonar.plugins.java.api.tree.MethodsAreNonnullByDefault;
 
 import java.util.Objects;
 
-@MethodsAreNonnullByDefault
 final class JType implements Type, Type.ArrayType {
 
-  private final Sema ast;
+  private final JSema sema;
   private final ITypeBinding typeBinding;
 
-  JType(Sema ast, ITypeBinding typeBinding) {
-    this.ast = Objects.requireNonNull(ast);
+  JType(JSema sema, ITypeBinding typeBinding) {
+    this.sema = Objects.requireNonNull(sema);
     this.typeBinding = Objects.requireNonNull(typeBinding);
   }
 
@@ -63,7 +61,9 @@ final class JType implements Type, Type.ArrayType {
       // as in our implementation
       return false;
     }
-    return typeBinding.isSubTypeCompatible(ast.resolveType(fullyQualifiedName));
+    return typeBinding.isSubTypeCompatible(
+      sema.resolveType(fullyQualifiedName)
+    );
   }
 
   @Override
@@ -88,7 +88,7 @@ final class JType implements Type, Type.ArrayType {
 
   @Override
   public boolean isVoid() {
-    return "V".equals(typeBinding.getBinaryName());
+    return "void".equals(typeBinding.getName());
   }
 
   @Override
@@ -111,14 +111,18 @@ final class JType implements Type, Type.ArrayType {
 
   @Override
   public boolean isNumerical() {
-    // TODO suboptimal
-    return isPrimitive(Primitives.BYTE)
-      || isPrimitive(Primitives.CHAR)
-      || isPrimitive(Primitives.SHORT)
-      || isPrimitive(Primitives.INT)
-      || isPrimitive(Primitives.LONG)
-      || isPrimitive(Primitives.FLOAT)
-      || isPrimitive(Primitives.DOUBLE);
+    switch (typeBinding.getName()) {
+      case "byte":
+      case "char":
+      case "short":
+      case "int":
+      case "long":
+      case "float":
+      case "double":
+        return true;
+      default:
+        return false;
+    }
   }
 
   @Override
@@ -149,20 +153,17 @@ final class JType implements Type, Type.ArrayType {
 
   @Override
   public Symbol.TypeSymbol symbol() {
-    return ast.typeSymbol(typeBinding);
+    return sema.typeSymbol(typeBinding);
   }
 
   @Override
   public Type erasure() {
-    return ast.type(typeBinding.getErasure());
+    return sema.type(typeBinding.getErasure());
   }
 
   @Override
   public Type elementType() {
-    if (!isArray()) {
-      // in our implementation only ArrayJavaType implements this method
-      throw new IllegalStateException();
-    }
-    return ast.type(typeBinding.getComponentType());
+    return sema.type(typeBinding.getComponentType());
   }
+
 }
