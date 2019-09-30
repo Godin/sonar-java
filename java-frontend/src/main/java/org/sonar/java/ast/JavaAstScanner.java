@@ -33,6 +33,7 @@ import org.sonar.api.utils.log.Logger;
 import org.sonar.api.utils.log.Loggers;
 import org.sonar.java.AnalysisException;
 import org.sonar.java.SonarComponents;
+import org.sonar.java.model.JCompiler;
 import org.sonar.java.model.JParser;
 import org.sonar.java.model.JavaVersionImpl;
 import org.sonar.java.model.VisitorsBridge;
@@ -54,6 +55,15 @@ public class JavaAstScanner {
     ProgressReport progressReport = new ProgressReport("Report about progress of Java AST analyzer", TimeUnit.SECONDS.toMillis(10));
     progressReport.start(Iterables.transform(inputFiles, InputFile::toString));
 
+    final String version;
+    if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
+      version = /* default */ "12";
+    } else {
+      version = Integer.toString(visitor.getJavaVersion().asInt());
+    }
+
+    final JCompiler compiler = new JCompiler(version, visitor.getClasspath(), true);
+
     boolean successfullyCompleted = false;
     boolean cancelled = false;
     try {
@@ -62,7 +72,7 @@ public class JavaAstScanner {
           cancelled = true;
           break;
         }
-        simpleScan(inputFile);
+        simpleScan(compiler, inputFile);
         progressReport.nextFile();
       }
       successfullyCompleted = !cancelled;
@@ -80,22 +90,10 @@ public class JavaAstScanner {
     return sonarComponents != null && sonarComponents.analysisCancelled();
   }
 
-  private void simpleScan(InputFile inputFile) {
+  private void simpleScan(JCompiler compiler, InputFile inputFile) {
     visitor.setCurrentFile(inputFile);
     try {
-      String fileContent = inputFile.contents();
-      final String version;
-      if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
-        version = /* default */ "12";
-      } else {
-        version = Integer.toString(visitor.getJavaVersion().asInt());
-      }
-      Tree ast = JParser.parse(
-        version,
-        inputFile.filename(),
-        fileContent,
-        visitor.getClasspath()
-      );
+      Tree ast = compiler.process(inputFile.filename(), inputFile.contents());
       visitor.visitFile(ast);
     } catch (RecognitionException e) {
       checkInterrupted(e);

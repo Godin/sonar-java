@@ -237,6 +237,10 @@ import java.util.Map;
 @ParametersAreNonnullByDefault
 public class JParser {
 
+  /**
+   * @deprecated use {@link JCompiler} instead
+   */
+  @Deprecated
   public static CompilationUnitTree parse(String version, String unitName, String source, List<File> classpath) {
     return parse(version, unitName, source, true, classpath);
   }
