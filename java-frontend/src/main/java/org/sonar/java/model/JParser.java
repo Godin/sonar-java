@@ -20,6 +20,7 @@
 package org.sonar.java.model;
 
 import com.sonar.sslr.api.RecognitionException;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.compiler.IProblem;
 import org.eclipse.jdt.core.compiler.InvalidInputException;
@@ -46,6 +47,7 @@ import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.CharacterLiteral;
 import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.CompilationUnitResolver2;
 import org.eclipse.jdt.core.dom.ConditionalExpression;
 import org.eclipse.jdt.core.dom.ConstructorInvocation;
 import org.eclipse.jdt.core.dom.ContinueStatement;
@@ -237,7 +239,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 @ParametersAreNonnullByDefault
 public class JParser {
@@ -270,26 +271,38 @@ public class JParser {
     astParser.setResolveBindings(true);
     astParser.setBindingsRecovery(true);
 
-    astParser.createASTs(
-      inputs.keySet().toArray(new String[0]),
-      null,
-      new String[0],
-      new FileASTRequestor() {
-        @Override
-        public void acceptAST(String sourceFilePath, CompilationUnit ast) {
-          InputFile input = inputs.get(sourceFilePath);
-          String source;
-          try {
-            source = input.contents();
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-          consumer.accept(
-            inputs.get(sourceFilePath),
-            convert(version, input.filename(), source, ast)
-          );
+    FileASTRequestor requestor = new FileASTRequestor() {
+      @Override
+      public void acceptAST(String sourceFilePath, CompilationUnit ast) {
+        InputFile input = inputs.get(sourceFilePath);
+        String source;
+        try {
+          source = input.contents();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
         }
-      },
+        consumer.accept(
+          inputs.get(sourceFilePath),
+          convert(version, input.filename(), source, ast)
+        );
+      }
+    };
+
+//    astParser.createASTs(
+//      inputs.keySet().toArray(new String[0]),
+//      null,
+//      new String[0],
+//      requestor,
+//      null
+//    );
+
+    CompilationUnitResolver2.resolve(
+      inputs.keySet().toArray(new String[0]),
+      requestor,
+      AST.JLS12,
+      options,
+      classpath,
+      ICompilationUnit.ENABLE_BINDINGS_RECOVERY,
       null
     );
   }
