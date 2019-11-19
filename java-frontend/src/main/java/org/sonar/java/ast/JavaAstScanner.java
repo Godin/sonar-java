@@ -27,6 +27,7 @@ import java.io.InterruptedIOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 import org.sonar.api.batch.fs.InputFile;
@@ -38,6 +39,7 @@ import org.sonar.java.model.JParser;
 import org.sonar.java.model.JavaVersionImpl;
 import org.sonar.java.model.VisitorsBridge;
 import org.sonar.plugins.java.api.JavaVersion;
+import org.sonar.plugins.java.api.tree.CompilationUnitTree;
 import org.sonar.plugins.java.api.tree.Tree;
 import org.sonarsource.analyzer.commons.ProgressReport;
 
@@ -80,9 +82,10 @@ public class JavaAstScanner {
     return sonarComponents != null && sonarComponents.analysisCancelled();
   }
 
-  private void simpleScan(InputFile inputFile, Tree ast) {
+  private void simpleScan(InputFile inputFile, Supplier<CompilationUnitTree> astSupplier) {
     visitor.setCurrentFile(inputFile);
     try {
+      CompilationUnitTree ast = astSupplier.get();
       visitor.visitFile(ast);
     } catch (RecognitionException e) {
       checkInterrupted(e);

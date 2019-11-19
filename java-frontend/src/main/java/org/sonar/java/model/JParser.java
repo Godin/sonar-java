@@ -239,6 +239,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 @ParametersAreNonnullByDefault
 public class JParser {
@@ -247,12 +248,12 @@ public class JParser {
     return parse(version, unitName, source, true, classpath);
   }
 
-  // FIXME: this breaks integration with SonarLint and processing of RecognitionException
+  // FIXME: this breaks integration with SonarLint
   public static void parse(
     String version,
     List<File> classpath,
     Map<String, InputFile> inputs,
-    BiConsumer<InputFile, CompilationUnitTree> consumer
+    BiConsumer<InputFile, Supplier<CompilationUnitTree>> consumer
   ) {
     ASTParser astParser = ASTParser.newParser(AST.JLS12);
     Map<String, String> options = new HashMap<>();
@@ -283,7 +284,7 @@ public class JParser {
         }
         consumer.accept(
           inputs.get(sourceFilePath),
-          convert(version, input.filename(), source, ast)
+          () -> convert(version, input.filename(), source, ast)
         );
       }
     };
@@ -341,6 +342,18 @@ public class JParser {
     astParser.setSource(sourceChars);
 
     CompilationUnit astNode = (CompilationUnit) astParser.createAST(null);
+    return convert(version, unitName, source, astNode);
+  }
+
+  /**
+   * @throws RecognitionException in case of syntax errors
+   */
+  private static JavaTree.CompilationUnitTreeImpl convert(
+    String version,
+    String unitName,
+    String source,
+    CompilationUnit astNode
+  ) {
     for (IProblem problem : astNode.getProblems()) {
       if (!problem.isError()) {
         continue;
@@ -353,15 +366,7 @@ public class JParser {
       final int column = astNode.getColumnNumber(problem.getSourceStart());
       throw new RecognitionException(line, "Parse error at line " + line + " column " + column + ": " + problem.getMessage());
     }
-    return convert(version, unitName, source, astNode);
-  }
 
-  private static JavaTree.CompilationUnitTreeImpl convert(
-    String version,
-    String unitName,
-    String source,
-    CompilationUnit astNode
-  ) {
     JParser converter = new JParser();
     converter.sema = new JSema(astNode.getAST());
     converter.compilationUnit = astNode;
