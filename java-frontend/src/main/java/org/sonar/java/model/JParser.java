@@ -297,9 +297,10 @@ public class JParser {
 //    );
 
     CompilationUnitResolver2.resolve(
-      inputs.keySet().toArray(new String[0]),
+      CompilationUnitResolver2.createSourceUnits(
+        inputs.keySet().toArray(new String[0])
+      ),
       requestor,
-      AST.JLS12,
       options,
       classpath,
       ICompilationUnit.ENABLE_BINDINGS_RECOVERY,
