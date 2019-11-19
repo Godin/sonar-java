@@ -23,7 +23,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
-import org.eclipse.jdt.internal.compiler.CompilationResult;
 import org.eclipse.jdt.internal.compiler.ICompilerRequestor;
 import org.eclipse.jdt.internal.compiler.IErrorHandlingPolicy;
 import org.eclipse.jdt.internal.compiler.IProblemFactory;
@@ -143,23 +142,36 @@ public class CompilationUnitResolver2 extends CompilationUnitResolver {
 
           char[] fileName = unit.compilationResult.getFileName();
           org.eclipse.jdt.internal.compiler.env.ICompilationUnit source = (org.eclipse.jdt.internal.compiler.env.ICompilationUnit) this.requestedSources.get(fileName);
-          CompilationResult compilationResult = unit.compilationResult;
-          org.eclipse.jdt.internal.compiler.env.ICompilationUnit sourceUnit = compilationResult.compilationUnit;
-          char[] contents = sourceUnit.getContents();
-          AST ast = AST.newAST(AST.JLS12);
-          ast.setFlag(flags | AST.RESOLVED_BINDINGS);
-          ast.setDefaultNodeFlag(ASTNode.ORIGINAL);
-          ASTConverter converter = new ASTConverter(compilerOptions, true, this.monitor);
-          BindingResolver resolver = new DefaultBindingResolver(unit.scope, null, this.bindingTables, (flags & ICompilationUnit.ENABLE_BINDINGS_RECOVERY) != 0, this.fromJavaProject);
-          ast.setBindingResolver(resolver);
-          converter.setAST(ast);
-          CompilationUnit compilationUnit = converter.convert(unit, contents);
-          compilationUnit.setTypeRoot(null);
-          compilationUnit.setLineEndTable(compilationResult.getLineSeparatorPositions());
-          ast.setDefaultNodeFlag(0);
-          ast.setOriginalModificationCount(ast.modificationCount());
+          CompilationUnit astNode = convert(
+            unit,
+            source.getContents(),
+            AST.JLS12,
+            compilerOptions,
+            true,
+            null,
+            this.bindingTables,
+            flags,
+            null,
+            false
+          );
 
-          astRequestor.acceptAST(new String(source.getFileName()), compilationUnit);
+//          CompilationResult compilationResult = unit.compilationResult;
+//          org.eclipse.jdt.internal.compiler.env.ICompilationUnit sourceUnit = compilationResult.compilationUnit;
+//          char[] contents = sourceUnit.getContents();
+//          AST ast = AST.newAST(AST.JLS12);
+//          ast.setFlag(flags | AST.RESOLVED_BINDINGS);
+//          ast.setDefaultNodeFlag(ASTNode.ORIGINAL);
+//          ASTConverter converter = new ASTConverter(compilerOptions, true, this.monitor);
+//          BindingResolver resolver = new DefaultBindingResolver(unit.scope, null, this.bindingTables, (flags & ICompilationUnit.ENABLE_BINDINGS_RECOVERY) != 0, this.fromJavaProject);
+//          ast.setBindingResolver(resolver);
+//          converter.setAST(ast);
+//          CompilationUnit compilationUnit = converter.convert(unit, contents);
+//          compilationUnit.setTypeRoot(null);
+//          compilationUnit.setLineEndTable(compilationResult.getLineSeparatorPositions());
+//          ast.setDefaultNodeFlag(0);
+//          ast.setOriginalModificationCount(ast.modificationCount());
+
+          astRequestor.acceptAST(new String(source.getFileName()), astNode);
         } finally {
           // cleanup compilation unit result
           unit.cleanUp();
