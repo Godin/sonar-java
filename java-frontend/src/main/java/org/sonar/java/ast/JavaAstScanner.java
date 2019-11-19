@@ -25,6 +25,7 @@ import com.google.common.collect.Iterables;
 import com.sonar.sslr.api.RecognitionException;
 import java.io.InterruptedIOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
@@ -51,27 +52,26 @@ public class JavaAstScanner {
   }
 
   public void scan(Iterable<InputFile> inputFiles) {
-    ProgressReport progressReport = new ProgressReport("Report about progress of Java AST analyzer", TimeUnit.SECONDS.toMillis(10));
-    progressReport.start(Iterables.transform(inputFiles, InputFile::toString));
-
-    boolean successfullyCompleted = false;
-    boolean cancelled = false;
     try {
-      for (InputFile inputFile : inputFiles) {
-        if (analysisCancelled()) {
-          cancelled = true;
-          break;
-        }
-        simpleScan(inputFile);
-        progressReport.nextFile();
-      }
-      successfullyCompleted = !cancelled;
-    } finally {
-      if (successfullyCompleted) {
-        progressReport.stop();
+      final String version;
+      if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
+        version = /* default */ "12";
       } else {
-        progressReport.cancel();
+        version = Integer.toString(visitor.getJavaVersion().asInt());
       }
+
+      HashMap<String, InputFile> inputs = new HashMap<>();
+      for (InputFile inputFile : inputFiles) {
+        inputs.put(inputFile.absolutePath(), inputFile);
+      }
+
+      JParser.parse(
+        version,
+        visitor.getClasspath(),
+        inputs,
+        this::simpleScan
+      );
+    } finally {
       visitor.endOfAnalysis();
     }
   }
@@ -80,22 +80,9 @@ public class JavaAstScanner {
     return sonarComponents != null && sonarComponents.analysisCancelled();
   }
 
-  private void simpleScan(InputFile inputFile) {
+  private void simpleScan(InputFile inputFile, Tree ast) {
     visitor.setCurrentFile(inputFile);
     try {
-      String fileContent = inputFile.contents();
-      final String version;
-      if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
-        version = /* default */ "12";
-      } else {
-        version = Integer.toString(visitor.getJavaVersion().asInt());
-      }
-      Tree ast = JParser.parse(
-        version,
-        inputFile.filename(),
-        fileContent,
-        visitor.getClasspath()
-      );
       visitor.visitFile(ast);
     } catch (RecognitionException e) {
       checkInterrupted(e);

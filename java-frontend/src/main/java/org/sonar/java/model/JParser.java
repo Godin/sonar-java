@@ -62,6 +62,7 @@ import org.eclipse.jdt.core.dom.ExpressionMethodReference;
 import org.eclipse.jdt.core.dom.ExpressionStatement;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.FileASTRequestor;
 import org.eclipse.jdt.core.dom.ForStatement;
 import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
@@ -135,6 +136,7 @@ import org.eclipse.jdt.internal.compiler.parser.TerminalTokens;
 import org.eclipse.jdt.internal.formatter.DefaultCodeFormatterOptions;
 import org.eclipse.jdt.internal.formatter.Token;
 import org.eclipse.jdt.internal.formatter.TokenManager;
+import org.sonar.api.batch.fs.InputFile;
 import org.sonar.java.ast.parser.ArgumentListTreeImpl;
 import org.sonar.java.ast.parser.BlockStatementListTreeImpl;
 import org.sonar.java.ast.parser.BoundListTreeImpl;
@@ -225,6 +227,7 @@ import org.sonar.plugins.java.api.tree.VariableTree;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -233,12 +236,62 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 @ParametersAreNonnullByDefault
 public class JParser {
 
   public static CompilationUnitTree parse(String version, String unitName, String source, List<File> classpath) {
     return parse(version, unitName, source, true, classpath);
+  }
+
+  // FIXME: this breaks integration with SonarLint and processing of RecognitionException
+  public static void parse(
+    String version,
+    List<File> classpath,
+    Map<String, InputFile> inputs,
+    BiConsumer<InputFile, CompilationUnitTree> consumer
+  ) {
+    ASTParser astParser = ASTParser.newParser(AST.JLS12);
+    Map<String, String> options = new HashMap<>();
+    options.put(JavaCore.COMPILER_COMPLIANCE, version);
+    options.put(JavaCore.COMPILER_SOURCE, version);
+    options.put(JavaCore.COMPILER_PB_ENABLE_PREVIEW_FEATURES, "enabled");
+    astParser.setCompilerOptions(options);
+
+    astParser.setEnvironment(
+      classpath.stream().map(File::getAbsolutePath).toArray(String[]::new),
+      new String[]{},
+      new String[]{},
+      true
+    );
+
+    astParser.setResolveBindings(true);
+    astParser.setBindingsRecovery(true);
+
+    astParser.createASTs(
+      inputs.keySet().toArray(new String[0]),
+      null,
+      new String[0],
+      new FileASTRequestor() {
+        @Override
+        public void acceptAST(String sourceFilePath, CompilationUnit ast) {
+          InputFile input = inputs.get(sourceFilePath);
+          String source;
+          try {
+            source = input.contents();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          consumer.accept(
+            inputs.get(sourceFilePath),
+            convert(version, input.filename(), source, ast)
+          );
+        }
+      },
+      null
+    );
   }
 
   /**
@@ -286,11 +339,19 @@ public class JParser {
       final int column = astNode.getColumnNumber(problem.getSourceStart());
       throw new RecognitionException(line, "Parse error at line " + line + " column " + column + ": " + problem.getMessage());
     }
+    return convert(version, unitName, source, astNode);
+  }
 
+  private static JavaTree.CompilationUnitTreeImpl convert(
+    String version,
+    String unitName,
+    String source,
+    CompilationUnit astNode
+  ) {
     JParser converter = new JParser();
     converter.sema = new JSema(astNode.getAST());
     converter.compilationUnit = astNode;
-    converter.tokenManager = new TokenManager(lex(version, unitName, sourceChars), source, new DefaultCodeFormatterOptions(new HashMap<>()));
+    converter.tokenManager = new TokenManager(lex(version, unitName, source.toCharArray()), source, new DefaultCodeFormatterOptions(new HashMap<>()));
 
     JavaTree.CompilationUnitTreeImpl tree = converter.convertCompilationUnit(astNode);
     tree.sema = converter.sema;
