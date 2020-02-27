@@ -23,11 +23,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.sonar.sslr.api.RecognitionException;
+
+import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
+import org.eclipse.core.runtime.NullProgressMonitor;
 import org.sonar.api.batch.fs.InputFile;
 import org.sonar.api.utils.log.Logger;
 import org.sonar.api.utils.log.Loggers;
@@ -51,27 +57,40 @@ public class JavaAstScanner {
   }
 
   public void scan(Iterable<InputFile> inputFiles) {
-    ProgressReport progressReport = new ProgressReport("Report about progress of Java AST analyzer", TimeUnit.SECONDS.toMillis(10));
-    progressReport.start(Iterables.transform(inputFiles, InputFile::toString));
+    // FIXME no progress report
+    final String version;
+    if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
+      version = /* default */ JParser.MAXIMUM_SUPPORTED_JAVA_VERSION;
+    } else {
+      version = Integer.toString(visitor.getJavaVersion().asInt());
+    }
 
-    boolean successfullyCompleted = false;
-    boolean cancelled = false;
+    Map<String, InputFile> inputs = new HashMap<>();
+    for (InputFile input : inputFiles) {
+      inputs.put(input.absolutePath(), input);
+    }
     try {
-      for (InputFile inputFile : inputFiles) {
-        if (analysisCancelled()) {
-          cancelled = true;
-          break;
-        }
-        simpleScan(inputFile);
-        progressReport.nextFile();
-      }
-      successfullyCompleted = !cancelled;
+      JParser.parse(
+        version,
+        visitor.getClasspath(),
+        inputs.keySet().toArray(new String[0]),
+        (filePath) -> {
+          try {
+            return inputs.get(filePath).contents();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        },
+        new NullProgressMonitor() {
+          @Override
+          public boolean isCanceled() {
+            return analysisCancelled() || super.isCanceled();
+          }
+        },
+        (filePath, result) -> simpleScan(inputs.get(filePath), result),
+        true
+      );
     } finally {
-      if (successfullyCompleted) {
-        progressReport.stop();
-      } else {
-        progressReport.cancel();
-      }
       visitor.endOfAnalysis();
     }
   }
@@ -80,23 +99,10 @@ public class JavaAstScanner {
     return sonarComponents != null && sonarComponents.analysisCancelled();
   }
 
-  private void simpleScan(InputFile inputFile) {
+  private void simpleScan(InputFile inputFile, JParser.Result result) {
     visitor.setCurrentFile(inputFile);
     try {
-      String fileContent = inputFile.contents();
-      final String version;
-      if (visitor.getJavaVersion() == null || visitor.getJavaVersion().asInt() < 0) {
-        version = /* default */ JParser.MAXIMUM_SUPPORTED_JAVA_VERSION;
-      } else {
-        version = Integer.toString(visitor.getJavaVersion().asInt());
-      }
-      Tree ast = JParser.parse(
-        version,
-        inputFile.filename(),
-        fileContent,
-        visitor.getClasspath()
-      );
-      visitor.visitFile(ast);
+      visitor.visitFile(result.get());
     } catch (RecognitionException e) {
       checkInterrupted(e);
       LOG.error(String.format("Unable to parse source file : '%s'", inputFile));
