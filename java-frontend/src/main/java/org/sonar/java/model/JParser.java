@@ -231,6 +231,8 @@ import org.sonar.plugins.java.api.tree.VariableTree;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -325,7 +327,18 @@ public class JParser {
     BooleanSupplier isCanceled,
     BiConsumer<InputFile, Result> action
   ) {
+    System.err.println("Using ECJ batch");
+
     ASTParser astParser = createASTParser(version, classpath);
+    try {
+      Method m = astParser.getClass().getDeclaredMethod("getClasspath");
+      m.setAccessible(true);
+      System.err.println(
+        m.invoke(astParser)
+      );
+    } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
 
     List<String> sourceFilePaths = new ArrayList<>();
     List<String> encodings = new ArrayList<>();
@@ -347,6 +360,8 @@ public class JParser {
       new FileASTRequestor() {
         @Override
         public void acceptAST(String sourceFilePath, CompilationUnit ast) {
+          System.err.println("Processing " + sourceFilePath);
+
           InputFile inputFile = inputs.get(new File(sourceFilePath));
           Result result;
           try {
@@ -423,6 +438,7 @@ public class JParser {
     CompilationUnit astNode
   ) {
     for (IProblem problem : astNode.getProblems()) {
+      System.err.println(new String(problem.getOriginatingFileName()) + " " + problem.getSourceLineNumber() + " " + problem.getMessage());
       if (!problem.isError()) {
         continue;
       }
