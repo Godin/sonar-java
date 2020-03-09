@@ -280,6 +280,7 @@ public class JParser {
   public static void parse(
     String version,
     List<File> classpath,
+    List<String> sourceRoots,
     Iterable<InputFile> inputFiles,
     BooleanSupplier isCanceled,
     boolean batch,
@@ -289,6 +290,7 @@ public class JParser {
       batch(
         version,
         classpath,
+        sourceRoots,
         inputFiles,
         isCanceled,
         action
@@ -318,18 +320,19 @@ public class JParser {
   /**
    * Reads files from filesystem.
    *
-   * @see #parse(String, List, Iterable, BooleanSupplier, boolean, BiConsumer)
+   * @see #parse(String, List, List, Iterable, BooleanSupplier, boolean, BiConsumer)
    */
   private static void batch(
     String version,
     List<File> classpath,
+    List<String> sourceRoots,
     Iterable<InputFile> inputFiles,
     BooleanSupplier isCanceled,
     BiConsumer<InputFile, Result> action
   ) {
     System.err.println("Using ECJ batch");
 
-    ASTParser astParser = createASTParser(version, classpath);
+    ASTParser astParser = createASTParser(version, classpath, sourceRoots);
     try {
       Method m = astParser.getClass().getDeclaredMethod("getClasspath");
       m.setAccessible(true);
@@ -383,7 +386,8 @@ public class JParser {
 
   private static ASTParser createASTParser(
     String version,
-    List<File> classpath
+    List<File> classpath,
+    List<String> sourceRoots
   ) {
     ASTParser astParser = ASTParser.newParser(AST.JLS13);
     Map<String, String> options = new HashMap<>();
@@ -395,8 +399,8 @@ public class JParser {
     astParser.setCompilerOptions(options);
     astParser.setEnvironment(
       classpath.stream().map(File::getAbsolutePath).toArray(String[]::new),
-      new String[]{},
-      new String[]{},
+      sourceRoots.toArray(new String[0]),
+      null,
       true
     );
     astParser.setResolveBindings(true);
@@ -414,7 +418,7 @@ public class JParser {
     String source,
     List<File> classpath
   ) {
-    ASTParser astParser = createASTParser(version, classpath);
+    ASTParser astParser = createASTParser(version, classpath, Collections.emptyList());
 
     astParser.setUnitName(unitName);
 

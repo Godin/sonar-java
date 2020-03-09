@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
@@ -156,6 +157,10 @@ public class SonarComponents {
       return new ArrayList<>();
     }
     return javaClasspath.getElements();
+  }
+
+  public List<String> sourceRoots() {
+    return projectDefinition == null ? Collections.emptyList() : projectDefinition.sources();
   }
 
   public List<File> getJavaTestClasspath() {

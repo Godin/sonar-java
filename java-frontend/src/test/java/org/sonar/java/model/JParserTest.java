@@ -58,6 +58,7 @@ public class JParserTest {
       JParser.parse(
         JParser.MAXIMUM_SUPPORTED_JAVA_VERSION,
         Collections.emptyList(),
+        Collections.emptyList(),
         Collections.singleton(inputFile),
         () -> false,
         false,
@@ -81,6 +82,7 @@ public class JParserTest {
 
     JParser.parse(
       JParser.MAXIMUM_SUPPORTED_JAVA_VERSION,
+      Collections.emptyList(),
       Collections.emptyList(),
       Collections.singleton(inputFile),
       () -> false,

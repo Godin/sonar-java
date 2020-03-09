@@ -58,6 +58,7 @@ public class JavaAstScanner {
       JParser.parse(
         version,
         visitor.getClasspath(),
+        sonarComponents == null ? Collections.emptyList() : sonarComponents.sourceRoots(),
         inputFiles,
         this::analysisCancelled,
         sonarComponents == null || !sonarComponents.isSonarLintContext(),
