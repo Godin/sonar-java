@@ -81,6 +81,17 @@ public class JavaSquidSensor implements Sensor {
     sonarComponents.registerCheckClasses(CheckList.REPOSITORY_KEY, checks);
     sonarComponents.registerTestCheckClasses(CheckList.REPOSITORY_KEY, CheckList.getJavaTestChecks());
 
+    System.err.println(
+      settings.get("sonar.sources")
+    );
+
+    // Can/How we can exclude `target/classes` / `bin` from `sonar.java.binaries` ?
+    // or
+    // Can/How we can find sourceRoot `src` ?
+
+    // sonar.sources=.
+    // whereas sourceRoot is `src`
+
     Measurer measurer = new Measurer(context, noSonarFilter);
     PostAnalysisIssueFilter postAnalysisIssueFilter = new PostAnalysisIssueFilter();
 

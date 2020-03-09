@@ -72,6 +72,8 @@ public abstract class SECheck implements JavaFileScanner {
   }
 
   public void reportIssue(Tree tree, String message, Set<Flow> flows) {
+    System.err.println(message);
+
     issues.add(issues.stream()
       .filter(seIssue -> seIssue.tree.equals(tree))
       .findFirst()

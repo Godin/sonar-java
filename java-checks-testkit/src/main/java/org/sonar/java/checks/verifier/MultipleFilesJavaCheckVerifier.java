@@ -20,12 +20,15 @@
 package org.sonar.java.checks.verifier;
 
 import com.google.common.annotations.Beta;
+
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import org.sonar.api.batch.fs.internal.TestInputFileBuilder;
 import org.sonar.java.AnalyzerMessage;
 import org.sonar.java.ast.JavaAstScanner;
@@ -92,7 +95,30 @@ public class MultipleFilesJavaCheckVerifier extends CheckVerifier {
   }
 
   private Set<AnalyzerMessage> scanFiles(List<String> filesToScan, JavaFileScanner check, boolean withSemantic) {
-    List<File> classPath = JavaCheckVerifier.getClassPath(JavaCheckVerifier.DEFAULT_TEST_JARS_DIRECTORY);
+    List<File> classPath =
+////      Collections.emptyList();
+      Arrays.asList(
+//        Classpath for JRT System /Users/evgeny.mandrikov/.java-select/versions/jdk-11.0.3_osx-x64_bin,
+        new File("/Users/evgeny.mandrikov/projects/sonarsource/sonar-java/its/sources/guava/target/classes/"),
+        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/code/findbugs/jsr305/1.3.9/jsr305-1.3.9.jar"),
+        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/errorprone/error_prone_annotations/2.0.2/error_prone_annotations-2.0.2.jar"),
+        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/j2objc/j2objc-annotations/0.1/j2objc-annotations-0.1.jar"),
+        new File("/Users/evgeny.mandrikov/.m2/repository/org/codehaus/mojo/animal-sniffer-annotations/1.14/animal-sniffer-annotations-1.14.jar")
+
+//        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/code/findbugs/jsr305/1.3.9/jsr305-1.3.9.jar"),
+//        new File("/Users/evgeny.mandrikov/.m2/repository/org/checkerframework/checker-qual/2.5.2/checker-qual-2.5.2.jar"),
+
+        // in ITs
+//        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/guava/guava/19.0-rc1/guava-19.0-rc1.jar")
+
+//        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/guava/guava/26.0-jre/guava-26.0-jre.jar")
+      );
+//      JavaCheckVerifier.getClassPath(JavaCheckVerifier.DEFAULT_TEST_JARS_DIRECTORY);
+
+//    System.out.println(
+//      JavaCheckVerifier.getClassPath(JavaCheckVerifier.DEFAULT_TEST_JARS_DIRECTORY)
+//    );
+
     VisitorsBridgeForTests visitorsBridge;
     if (withSemantic) {
       visitorsBridge = new VisitorsBridgeForTests(Arrays.asList(check, new JavaCheckVerifier.ExpectedIssueCollector(this)), classPath, null);

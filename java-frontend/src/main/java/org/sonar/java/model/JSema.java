@@ -47,6 +47,7 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -158,6 +159,11 @@ public final class JSema implements Sema {
       );
       if (answer == null) {
         return new IAnnotationBinding[0];
+      }
+
+      ICompilationUnit compilationUnit = answer.getCompilationUnit();
+      if (compilationUnit != null) {
+//        throw new UnsupportedOperationException();
       }
 
       IBinaryType type = answer.getBinaryType();

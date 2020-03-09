@@ -333,6 +333,15 @@ public class JParser {
     System.err.println("Using ECJ batch");
 
     ASTParser astParser = createASTParser(version, classpath, sourceRoots);
+
+    astParser.setEnvironment(
+      classpath.stream().map(File::getAbsolutePath).toArray(String[]::new),
+      Collections.singletonList("/Users/evgeny.mandrikov/projects/sonarsource/sonar-java/java-checks/src/test/files/checks/wip/").toArray(new String[0]),
+//      sourceRoots.toArray(new String[0]),
+      null,
+      true
+    );
+
     try {
       Method m = astParser.getClass().getDeclaredMethod("getClasspath");
       m.setAccessible(true);
