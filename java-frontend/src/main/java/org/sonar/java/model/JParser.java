@@ -400,6 +400,7 @@ public class JParser {
   ) {
     ASTParser astParser = ASTParser.newParser(AST.JLS13);
     Map<String, String> options = new HashMap<>();
+    version = "8";
     options.put(JavaCore.COMPILER_COMPLIANCE, version);
     options.put(JavaCore.COMPILER_SOURCE, version);
     if (MAXIMUM_SUPPORTED_JAVA_VERSION.equals(version)) {

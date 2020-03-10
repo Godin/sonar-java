@@ -269,6 +269,7 @@ public final class JUtils {
     return new JSymbolMetadata(
       ((JSymbol) method).sema,
       methodBinding.getParameterTypes()[param].getTypeAnnotations(),
+      // TODO:
       methodBinding.getParameterAnnotations(param)
     );
   }

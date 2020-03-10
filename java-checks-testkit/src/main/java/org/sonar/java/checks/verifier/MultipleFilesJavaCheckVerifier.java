@@ -99,11 +99,12 @@ public class MultipleFilesJavaCheckVerifier extends CheckVerifier {
 ////      Collections.emptyList();
       Arrays.asList(
 //        Classpath for JRT System /Users/evgeny.mandrikov/.java-select/versions/jdk-11.0.3_osx-x64_bin,
-        new File("/Users/evgeny.mandrikov/projects/sonarsource/sonar-java/its/sources/guava/target/classes/"),
-        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/code/findbugs/jsr305/1.3.9/jsr305-1.3.9.jar"),
-        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/errorprone/error_prone_annotations/2.0.2/error_prone_annotations-2.0.2.jar"),
-        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/j2objc/j2objc-annotations/0.1/j2objc-annotations-0.1.jar"),
-        new File("/Users/evgeny.mandrikov/.m2/repository/org/codehaus/mojo/animal-sniffer-annotations/1.14/animal-sniffer-annotations-1.14.jar")
+//        new File("/Users/evgeny.mandrikov/projects/sonarsource/sonar-java/its/sources/guava/target/classes/"),
+//        new File("/tmp/classes/"),
+        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/code/findbugs/jsr305/1.3.9/jsr305-1.3.9.jar")
+//        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/errorprone/error_prone_annotations/2.0.2/error_prone_annotations-2.0.2.jar"),
+//        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/j2objc/j2objc-annotations/0.1/j2objc-annotations-0.1.jar"),
+//        new File("/Users/evgeny.mandrikov/.m2/repository/org/codehaus/mojo/animal-sniffer-annotations/1.14/animal-sniffer-annotations-1.14.jar")
 
 //        new File("/Users/evgeny.mandrikov/.m2/repository/com/google/code/findbugs/jsr305/1.3.9/jsr305-1.3.9.jar"),
 //        new File("/Users/evgeny.mandrikov/.m2/repository/org/checkerframework/checker-qual/2.5.2/checker-qual-2.5.2.jar"),

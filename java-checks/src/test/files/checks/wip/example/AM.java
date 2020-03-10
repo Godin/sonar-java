@@ -1,10 +1,9 @@
-package com.google.common.collect;
+package example;
 
 //import org.checkerframework.checker.nullness.qual.Nullable;
 import javax.annotation.Nullable;
 
-@javax.annotation.ParametersAreNonnullByDefault
-abstract class AbstractMultimap<K, V> implements Multimap<K, V> {
+abstract class AM<K, V> implements M<K, V> {
 
 //  public void test(@javax.annotation.Nullable Object o) {
 //    x(o); // SHOULD RAISE ISSUE
@@ -13,8 +12,8 @@ abstract class AbstractMultimap<K, V> implements Multimap<K, V> {
 //  public void x(Object o) {
 //  }
 
-  public void put() {
-    get(null);
+  public void put(@Nullable K key) {
+    g(key);
   }
 
 }

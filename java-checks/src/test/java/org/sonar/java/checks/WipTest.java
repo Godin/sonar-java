@@ -57,9 +57,14 @@ public class WipTest {
 
     /// In this case Multimap.java exists as both input and class file
     MultipleFilesJavaCheckVerifier.verify(Arrays.asList(
-      "src/test/files/checks/wip/com/google/common/collect/AbstractMultimap.java",
-      "src/test/files/checks/wip/com/google/common/collect/Multimap.java"
+      "src/test/files/checks/wip/com/google/common/collect/Multimap.java",
+      "src/test/files/checks/wip/com/google/common/collect/AbstractMultimap.java"
     ), new ParameterNullnessCheck());
+
+//    MultipleFilesJavaCheckVerifier.verify(Arrays.asList(
+//      "src/test/files/checks/wip/example/AM.java",
+//      "src/test/files/checks/wip/example/M.java"
+//    ), new ParameterNullnessCheck());
 
 //    MultipleFilesJavaCheckVerifier.verify(Arrays.asList(
 //      "/Users/evgeny.mandrikov/projects/sonarsource/sonar-java/its/sources/guava/src/com/google/common/collect/AbstractMultimap.java" // 384
