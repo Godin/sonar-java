@@ -44,6 +44,7 @@ import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.CompilationUnitResolverDiscovery;
 import org.eclipse.jdt.internal.compiler.parser.TerminalToken;
 import org.eclipse.jdt.internal.formatter.Token;
 import org.eclipse.jdt.internal.formatter.TokenManager;
@@ -110,6 +111,49 @@ class JParserTest {
 
   @RegisterExtension
   public ThreadLocalLogTester logTester = new ThreadLocalLogTester().setLevel(Level.DEBUG);
+
+  CompilationUnitTreeImpl jep247(String release) {
+    CompilationUnitResolverDiscovery.JAVA_HOME = "/Users/evgeny.mandrikov/.java-select/versions/25";
+    CompilationUnitResolverDiscovery.VERSION = release;
+    List<File> classpath = List.of();
+    ASTParser astParser = FILE_BY_FILE.create(JavaVersionImpl.fromString(release), classpath).astParser();
+    CompilationUnitTreeImpl cut = JParser.parse(astParser, release, "Example", """
+      class Example {
+        static {
+          java.lang.StackWalker.getInstance(); // added in JDK 9
+        }
+        static {
+          java.util.jar.Pack200 p; // removed in JDK 14
+        }
+        static {
+          javax.security.auth.Policy policy; // deprecated in JDK 8, removed in JDK 11
+        }
+      }
+      """);
+    System.err.println(release + ":" + cut.sema.undefinedTypes);
+    return cut;
+  }
+
+  /**
+   * @see org.eclipse.jdt.internal.compiler.util.CtSym
+   */
+  @Test
+  void jep247() {
+    assertThat(
+      jep247("8").sema.undefinedTypes.stream().map(Object::toString)
+    ).containsExactlyInAnyOrder(
+      "The type Policy is deprecated",
+      "java.lang.StackWalker cannot be resolved to a type");
+    assertThat(
+      jep247("11").sema.undefinedTypes.stream().map(Object::toString)
+    ).containsExactlyInAnyOrder(
+      "javax.security.auth.Policy cannot be resolved to a type");
+    assertThat(
+      jep247("14").sema.undefinedTypes.stream().map(Object::toString)
+    ).containsExactlyInAnyOrder(
+      "javax.security.auth.Policy cannot be resolved to a type",
+      "java.util.jar.Pack200 cannot be resolved to a type");
+  }
 
   @Test
   void should_throw_RecognitionException_in_case_of_syntax_error() {
